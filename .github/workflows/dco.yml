@@ -1,0 +1,57 @@
+name: DCO
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: Check DCO sign-off
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history for the base..head walk below.
+          fetch-depth: 0
+
+      - name: Verify every commit has a Signed-off-by trailer
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          missing=0
+          while read -r sha; do
+            [ -z "$sha" ] && continue
+            author="$(git show -s --format='%an <%ae>' "$sha")"
+            trailers="$(git show -s --format='%(trailers:key=Signed-off-by,valueonly=true)' "$sha" | tr -d '\r')"
+            if [ -z "$trailers" ]; then
+              echo "::error::commit $sha by $author is missing a Signed-off-by trailer"
+              missing=$((missing + 1))
+              continue
+            fi
+            # Ensure at least one Signed-off-by matches the commit author.
+            ok=0
+            while IFS= read -r trailer; do
+              [ -z "$trailer" ] && continue
+              if [ "$trailer" = "$author" ]; then
+                ok=1
+                break
+              fi
+            done <<EOF
+          $trailers
+          EOF
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::commit $sha: Signed-off-by does not match author $author (got: $trailers)"
+              missing=$((missing + 1))
+            fi
+          done < <(git rev-list --no-merges "$BASE_SHA".."$HEAD_SHA")
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::$missing commit(s) missing or mismatched Signed-off-by"
+            echo "Re-author with: git commit --amend --signoff   (or rebase --signoff for several)"
+            exit 1
+          fi
+          echo "All commits carry a matching Signed-off-by."

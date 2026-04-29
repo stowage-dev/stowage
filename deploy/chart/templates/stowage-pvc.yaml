@@ -1,0 +1,21 @@
+{{- if .Values.stowage.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stowage-data
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+  annotations:
+    # SQLite + the auto-generated key file live here. Reclaiming the volume
+    # erases the user database; keep across helm uninstall.
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+  {{- with .Values.storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

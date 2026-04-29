@@ -1,0 +1,60 @@
+# Benchmark configuration. Relaxed password rules so the seed admin can be
+# created with a short password; everything else mirrors the demo profile.
+server:
+  listen: ":8080"
+  # Auto-generated on first boot if missing. Required for the embedded S3
+  # proxy because it seals UI-issued virtual-credential secrets at rest.
+  secret_key_file: /data/stowage-bench.key
+
+log:
+  level: warn
+  format: text
+
+db:
+  driver: sqlite
+  sqlite:
+    path: /data/stowage-bench.db
+
+auth:
+  modes: [local]
+  session:
+    lifetime: 8h
+    idle_timeout: 1h
+  local:
+    password:
+      min_length: 8
+      zxcvbn_min_score: 0
+      prevent_reuse: false
+    lockout:
+      max_attempts: 1000000
+      window: 1m
+
+ratelimit:
+  # 0 disables the per-session limiter — required for high-throughput
+  # benchmarking; otherwise a single hot session would 429 within a minute.
+  api_per_minute: 0
+
+# Embedded S3 SigV4 proxy. Bound on a separate port so the dashboard and
+# proxy benches don't collide on a single Listen socket. Limiters are left
+# at 0 (unlimited) so the bench client drives the proxy as hard as the
+# 1 CPU / 200 MiB envelope allows.
+s3_proxy:
+  enabled: true
+  listen: ":8090"
+  global_rps: 0
+  per_key_rps: 0
+  anonymous_enabled: true
+  # Per-source-IP default for anonymous requests when a binding doesn't
+  # override; raised well above any sane production value because the
+  # bench client looks like a single IP hammering a single binding.
+  anonymous_rps: 100000
+
+backends:
+  - id: local-minio
+    name: "Local MinIO"
+    type: s3v4
+    endpoint: http://minio:9000
+    region: us-east-1
+    access_key_env: MINIO_ACCESS_KEY
+    secret_key_env: MINIO_SECRET_KEY
+    path_style: true

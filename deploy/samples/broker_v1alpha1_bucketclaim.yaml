@@ -1,0 +1,28 @@
+apiVersion: broker.stowage.io/v1alpha1
+kind: BucketClaim
+metadata:
+  name: uploads
+  namespace: my-app
+spec:
+  backendRef:
+    name: primary
+  deletionPolicy: Retain
+  forceDelete: false
+  writeConnectionSecretToRef:
+    name: uploads-s3
+  rotationPolicy:
+    mode: Manual
+    intervalDays: 90
+    overlapSeconds: 300
+  # AnonymousAccess opens the bucket to unauthenticated callers via the
+  # broker proxy. Mode "None" (default) preserves today's behaviour: every
+  # request must carry a valid SigV4 signature. Mode "ReadOnly" allows
+  # GET/HEAD/ListObjects with no Authorization header; all mutating
+  # operations and sub-resource queries (?acl, ?policy, ?versioning, ...)
+  # remain rejected. Anonymous traffic is rate-limited per source IP
+  # independently of the per-AKID limiter.
+  anonymousAccess:
+    mode: None
+    # perSourceIPRPS bounds anonymous requests/second per client IP.
+    # 0 means inherit the proxy default (configured at install time).
+    perSourceIPRPS: 0

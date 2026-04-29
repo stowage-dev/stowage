@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>stowage</title>
+		<script>
+			// Apply persisted theme synchronously to avoid flash of light theme.
+			try {
+				const t = localStorage.getItem('stw-theme');
+				if (t === 'dark' || t === 'light') {
+					document.documentElement.dataset.theme = t;
+				}
+			} catch (_) {}
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div class="stw-root" style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

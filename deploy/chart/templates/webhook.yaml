@@ -1,0 +1,71 @@
+{{- if and .Values.operator.enabled .Values.webhook.enabled }}
+{{- $caBundle := include "stowage.webhookCABundle" . | trim -}}
+{{- $certManagerAnnotation := "" -}}
+{{- if .Values.webhook.certManager.enabled -}}
+  {{- $certManagerAnnotation = printf "cert-manager.io/inject-ca-from: %s/stowage-operator-webhook-cert" .Values.namespace -}}
+{{- end -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: stowage-operator-webhook
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.operatorLabels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "stowage.operatorSelector" . | nindent 4 }}
+  ports:
+    - name: webhook
+      port: 443
+      targetPort: webhook
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: stowage-operator-validating-webhook
+  labels:
+    {{- include "stowage.operatorLabels" . | nindent 4 }}
+  {{- if $certManagerAnnotation }}
+  annotations:
+    {{ $certManagerAnnotation }}
+  {{- end }}
+webhooks:
+  - name: vs3backend.broker.stowage.io
+    admissionReviewVersions: [v1]
+    sideEffects: None
+    failurePolicy: {{ .Values.webhook.failurePolicy }}
+    timeoutSeconds: 10
+    clientConfig:
+      service:
+        name: stowage-operator-webhook
+        namespace: {{ .Values.namespace }}
+        path: /validate-broker-stowage-io-v1alpha1-s3backend
+      {{- if $caBundle }}
+      caBundle: {{ $caBundle }}
+      {{- end }}
+    rules:
+      - apiGroups: [broker.stowage.io]
+        apiVersions: [v1alpha1]
+        operations: [CREATE, UPDATE]
+        resources: [s3backends]
+        scope: Cluster
+  - name: vbucketclaim.broker.stowage.io
+    admissionReviewVersions: [v1]
+    sideEffects: None
+    failurePolicy: {{ .Values.webhook.failurePolicy }}
+    timeoutSeconds: 10
+    clientConfig:
+      service:
+        name: stowage-operator-webhook
+        namespace: {{ .Values.namespace }}
+        path: /validate-broker-stowage-io-v1alpha1-bucketclaim
+      {{- if $caBundle }}
+      caBundle: {{ $caBundle }}
+      {{- end }}
+    rules:
+      - apiGroups: [broker.stowage.io]
+        apiVersions: [v1alpha1]
+        operations: [CREATE, UPDATE]
+        resources: [bucketclaims]
+        scope: Namespaced
+{{- end }}

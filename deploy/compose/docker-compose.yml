@@ -1,0 +1,40 @@
+# Minimal stack for kicking the tyres: stowage + a single MinIO backend.
+# Extend this with Garage/SeaweedFS as needed.
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  stowage:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    depends_on:
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      STOWAGE_LISTEN: ":8080"
+      STOWAGE_LOG_FORMAT: json
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ../../config.example.yaml:/etc/stowage/config.yaml:ro
+    command: ["serve", "--config", "/etc/stowage/config.yaml"]
+
+volumes:
+  minio-data: {}

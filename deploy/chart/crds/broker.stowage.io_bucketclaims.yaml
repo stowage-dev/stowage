@@ -1,0 +1,136 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: bucketclaims.broker.stowage.io
+spec:
+  group: broker.stowage.io
+  names:
+    kind: BucketClaim
+    listKind: BucketClaimList
+    plural: bucketclaims
+    singular: bucketclaim
+    shortNames: [bc]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Bucket
+          type: string
+          jsonPath: .status.bucketName
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=="Ready")].status
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [backendRef]
+              x-kubernetes-validations:
+                - rule: "!self.forceDelete || self.deletionPolicy == 'Delete'"
+                  message: "forceDelete=true requires deletionPolicy=Delete"
+              properties:
+                backendRef:
+                  type: object
+                  required: [name]
+                  properties:
+                    name: {type: string, minLength: 1}
+                bucketName:
+                  type: string
+                  pattern: ^$|^[a-z0-9][a-z0-9.-]{2,62}$
+                  x-kubernetes-validations:
+                    - rule: "self == oldSelf"
+                      message: "bucketName is immutable"
+                deletionPolicy:
+                  type: string
+                  enum: [Delete, Retain]
+                  default: Retain
+                forceDelete:
+                  type: boolean
+                  default: false
+                writeConnectionSecretToRef:
+                  type: object
+                  properties:
+                    name: {type: string, minLength: 1}
+                rotationPolicy:
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.mode != 'TimeBased' || self.intervalDays >= 7"
+                      message: "TimeBased rotation requires intervalDays >= 7"
+                  properties:
+                    mode:
+                      type: string
+                      enum: [Manual, TimeBased]
+                      default: Manual
+                    intervalDays:
+                      type: integer
+                      minimum: 1
+                      default: 90
+                    overlapSeconds:
+                      type: integer
+                      minimum: 0
+                      default: 300
+                anonymousAccess:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum: [None, ReadOnly]
+                      default: None
+                    perSourceIPRPS:
+                      type: integer
+                      minimum: 0
+                      default: 0
+                quota:
+                  type: object
+                  description: |
+                    Optional per-bucket storage limits enforced by the
+                    stowage S3 proxy. Soft is the warning threshold (logged
+                    in the proxy's audit trail); Hard causes uploads past
+                    the cap to be rejected with HTTP 507 EntityTooLarge.
+                    Either field may be omitted; omitting both is
+                    equivalent to no quota.
+                  properties:
+                    soft:
+                      anyOf: [{type: integer}, {type: string}]
+                      pattern: '^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$'
+                      x-kubernetes-int-or-string: true
+                    hard:
+                      anyOf: [{type: integer}, {type: string}]
+                      pattern: '^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$'
+                      x-kubernetes-int-or-string: true
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Creating, Bound, Failed, Deleting]
+                bucketName: {type: string}
+                proxyEndpoint: {type: string}
+                boundSecretName: {type: string}
+                accessKeyId: {type: string}
+                rotatedAt: {type: string, format: date-time}
+                observedGeneration: {type: integer}
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, status, lastTransitionTime, reason]
+                    properties:
+                      type: {type: string}
+                      status: {type: string, enum: ["True", "False", "Unknown"]}
+                      lastTransitionTime: {type: string, format: date-time}
+                      reason: {type: string}
+                      message: {type: string}
+                      observedGeneration: {type: integer}

@@ -1,0 +1,17 @@
+apiVersion: broker.stowage.io/v1alpha1
+kind: S3Backend
+metadata:
+  name: primary
+spec:
+  endpoint: https://nas.internal.example:8010
+  region: us-east-1
+  addressingStyle: path
+  quobjectsStorageSpace: k8s-buckets
+  adminCredentialsSecretRef:
+    name: backend-admin-credentials
+    namespace: stowage-system
+    accessKeyField: access_key
+    secretKeyField: secret_key
+  tls:
+    insecureSkipVerify: false
+  bucketNameTemplate: "{{ .Namespace }}-{{ .Name }}"

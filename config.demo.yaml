@@ -1,0 +1,51 @@
+# Local demo config — single local-auth user, optional MinIO backend.
+#
+# Quickstart:
+#   1. (optional) docker compose -f deploy/compose/docker-compose.yml up -d minio
+#   2. ./bin/stowage create-admin --config config.demo.yaml \
+#        --username admin --password 'changeme-please-1234'
+#   3. MINIO_ACCESS_KEY=minioadmin MINIO_SECRET_KEY=minioadmin \
+#        ./bin/stowage serve --config config.demo.yaml
+#   4. Open http://localhost:8080
+#
+# If MinIO isn't running the UI still works — the local-minio backend
+# just renders with a red health dot.
+s3_proxy:
+  enabled: true
+  anonymous_enabled: true
+
+server:
+  listen: ":8080"
+  secret_key_file: ./stowage.key
+log:
+  level: info
+  format: text
+
+db:
+  driver: sqlite
+  sqlite:
+    path: ./stowage-demo.db
+
+auth:
+  modes: [local]
+  session:
+    lifetime: 8h
+    idle_timeout: 1h
+  local:
+    password:
+      min_length: 12
+      zxcvbn_min_score: 0   # relaxed for demo only
+      prevent_reuse: false
+    lockout:
+      max_attempts: 10
+      window: 15m
+
+backends:
+  - id: local-minio
+    name: "Local MinIO"
+    type: s3v4
+    endpoint: http://127.0.0.1:9000
+    region: us-east-1
+    access_key_env: MINIO_ACCESS_KEY
+    secret_key_env: MINIO_SECRET_KEY
+    path_style: true

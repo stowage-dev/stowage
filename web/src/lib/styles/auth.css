@@ -1,0 +1,499 @@
+/* Copyright (C) 2026 Damian van der Merwe */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
+/* Stowage auth tokens — light */
+.lg {
+	--bg: #ffffff;
+	--bg-soft: #fafaf9;
+	--bg-hover: #f4f4f3;
+	--bg-active: #f0efed;
+	--canvas: #f4f2ed;
+	--border: #e7e5e0;
+	--border-strong: #d9d6cf;
+	--fg: #1c1b1a;
+	--fg-muted: #6b6862;
+	--fg-faint: #9a958c;
+	--accent: #c96442;
+	--accent-hover: #b9583a;
+	--accent-soft: rgba(201, 100, 66, 0.1);
+	--ok: #4a8f5a;
+	--warn: #c4923a;
+	--err: #c0524a;
+	--err-soft: rgba(192, 82, 74, 0.08);
+	--shadow-card: 0 1px 0 rgba(0, 0, 0, 0.02), 0 12px 32px -16px rgba(20, 15, 10, 0.08);
+
+	width: 100%;
+	min-height: 100dvh;
+	color: var(--fg);
+	background: var(--canvas);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	font-size: 13.5px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	padding: 24px;
+}
+
+/* Stowage auth tokens — dark */
+.lg.dark {
+	--bg: #131313;
+	--bg-soft: #181817;
+	--bg-hover: #1f1f1e;
+	--bg-active: #262624;
+	--canvas: #0d0d0c;
+	--border: #262624;
+	--border-strong: #34332f;
+	--fg: #ececea;
+	--fg-muted: #8b8780;
+	--fg-faint: #5d5a55;
+	--accent: #e08267;
+	--accent-hover: #ec9078;
+	--accent-soft: rgba(224, 130, 103, 0.14);
+	--ok: #6fb27e;
+	--err: #d76a62;
+	--err-soft: rgba(215, 106, 98, 0.1);
+	--shadow-card: 0 1px 0 rgba(0, 0, 0, 0.5), 0 24px 48px -16px rgba(0, 0, 0, 0.5);
+}
+
+/* Subtle dotted texture in the canvas */
+.lg::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+	background-size: 22px 22px;
+	opacity: 0.55;
+	pointer-events: none;
+	mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.lg.dark::before {
+	opacity: 0.4;
+}
+
+/* Card */
+.lg .card {
+	width: 380px;
+	max-width: 100%;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	box-shadow: var(--shadow-card);
+	padding: 28px;
+	position: relative;
+	z-index: 1;
+}
+
+/* Brand header */
+.lg .brand-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 22px;
+}
+.lg .brand-mark {
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	background: #1c1b1a;
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 14px;
+	letter-spacing: -0.02em;
+}
+.lg.dark .brand-mark {
+	background: #ececea;
+	color: #131313;
+}
+.lg .brand-name {
+	font-weight: 600;
+	font-size: 15px;
+	letter-spacing: -0.01em;
+}
+.lg .brand-meta {
+	margin-left: auto;
+	font-family: 'JetBrains Mono', ui-monospace, monospace;
+	font-size: 10.5px;
+	color: var(--fg-faint);
+	letter-spacing: 0.02em;
+}
+.lg .brand-meta .dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--ok);
+	margin-right: 5px;
+	vertical-align: 1px;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);
+}
+
+/* Headings */
+.lg h1.title {
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: -0.015em;
+	margin: 0 0 5px;
+}
+.lg p.sub {
+	font-size: 13px;
+	color: var(--fg-muted);
+	margin: 0 0 20px;
+	line-height: 1.4;
+}
+
+/* Field */
+.lg .field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: 14px;
+	position: relative;
+}
+.lg .field label {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--fg-muted);
+	letter-spacing: -0.005em;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.lg .field label .helper {
+	font-size: 12px;
+	font-weight: 450;
+	color: var(--accent);
+	cursor: pointer;
+	text-decoration: none;
+}
+.lg .field label .helper:hover {
+	text-decoration: underline;
+}
+
+.lg .input {
+	width: 100%;
+	height: 38px;
+	padding: 0 12px;
+	background-color: var(--bg-soft);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13.5px;
+	transition:
+		border-color 0.12s,
+		background-color 0.12s,
+		box-shadow 0.12s;
+	outline: none;
+	-webkit-appearance: none;
+	appearance: none;
+	color-scheme: light dark;
+}
+.lg .input::placeholder {
+	color: var(--fg-faint);
+}
+
+/* Higher-specificity dark overrides — required because <input> UA appearance
+   doesn't always paint var(--bg-soft) reliably even with appearance:none. */
+.lg.dark .input {
+	background-color: #181817;
+	color: #ececea;
+}
+.lg.dark .input:focus {
+	background-color: #131313;
+}
+.lg.dark .input::placeholder {
+	color: #5d5a55;
+}
+.lg.dark .field.has-error .input {
+	background-color: rgba(215, 106, 98, 0.1);
+}
+
+/* Defeat Chrome autofill's hard-coded yellow/white wash */
+.lg .input:-webkit-autofill,
+.lg .input:-webkit-autofill:hover,
+.lg .input:-webkit-autofill:focus {
+	-webkit-text-fill-color: var(--fg);
+	-webkit-box-shadow: 0 0 0 1000px var(--bg-soft) inset;
+	caret-color: var(--fg);
+	transition:
+		background-color 99999s 0s,
+		color 99999s 0s;
+}
+.lg .input:hover {
+	border-color: var(--border-strong);
+}
+.lg .input:focus {
+	background-color: var(--bg);
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Field affixes */
+.lg .input.with-prefix {
+	padding-left: 32px;
+}
+.lg .field .prefix {
+	position: absolute;
+	left: 11px;
+	top: 34px;
+	color: var(--fg-faint);
+	pointer-events: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+}
+.lg .field .suffix-btn {
+	position: absolute;
+	right: 8px;
+	top: 32px;
+	width: 24px;
+	height: 24px;
+	border-radius: 5px;
+	border: 0;
+	background: transparent;
+	color: var(--fg-faint);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.lg .field .suffix-btn:hover {
+	background: var(--bg-hover);
+	color: var(--fg);
+}
+
+/* Error states */
+.lg .field.has-error .input {
+	border-color: var(--err);
+	background-color: var(--err-soft);
+}
+.lg .field.has-error .input:focus {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 18%, transparent);
+}
+.lg .err-text {
+	font-size: 11.5px;
+	color: var(--err);
+	margin-top: 6px;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+/* Form-level banner */
+.lg .err-banner {
+	background: var(--err-soft);
+	border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
+	color: var(--err);
+	border-radius: 8px;
+	padding: 10px 12px;
+	font-size: 12.5px;
+	line-height: 1.4;
+	margin-bottom: 14px;
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+}
+.lg .err-banner svg {
+	flex: 0 0 auto;
+	margin-top: 1px;
+}
+
+/* Warn banner — sits above the card on the canvas (e.g. static-admin notice) */
+.lg .warn-banner {
+	width: 380px;
+	max-width: 100%;
+	margin-bottom: 16px;
+	padding: 10px 14px;
+	background: color-mix(in srgb, var(--warn, #c4923a) 12%, var(--bg));
+	border: 1px solid color-mix(in srgb, var(--warn, #c4923a) 35%, var(--border));
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12.5px;
+	color: color-mix(in srgb, var(--warn, #c4923a) 70%, var(--fg));
+	position: relative;
+	z-index: 1;
+}
+
+/* Auth-page divider (used between OIDC and local form) */
+.lg .auth-divider {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--fg-faint);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	margin: 14px 0;
+}
+.lg .auth-divider::before,
+.lg .auth-divider::after {
+	content: '';
+	flex: 1;
+	height: 1px;
+	background: var(--border);
+}
+
+/* Buttons */
+.lg .btn {
+	width: 100%;
+	height: 40px;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	font: inherit;
+	font-size: 13.5px;
+	font-weight: 550;
+	letter-spacing: -0.005em;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	transition:
+		background 0.12s,
+		border-color 0.12s,
+		color 0.12s,
+		transform 0.06s;
+}
+.lg .btn:active {
+	transform: translateY(0.5px);
+}
+.lg .btn-primary {
+	background-color: var(--accent);
+	color: #fff;
+	border-color: var(--accent);
+}
+.lg .btn-primary:hover {
+	background-color: var(--accent-hover);
+	border-color: var(--accent-hover);
+}
+.lg .btn-primary[disabled],
+.lg .btn-primary.loading {
+	background-color: color-mix(in srgb, var(--accent) 60%, var(--bg-hover));
+	border-color: transparent;
+	cursor: progress;
+}
+.lg .btn-secondary {
+	background-color: var(--bg);
+	color: var(--fg);
+	border-color: var(--border);
+}
+.lg .btn-secondary:hover {
+	background-color: var(--bg-hover);
+	border-color: var(--border-strong);
+}
+.lg .btn .ico {
+	width: 16px;
+	height: 16px;
+	flex: 0 0 auto;
+}
+
+/* Text-only link button (e.g. "Sign in with username →") */
+.lg .link-btn {
+	background: transparent;
+	border: 0;
+	color: var(--fg-muted);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+	padding: 6px;
+	text-align: center;
+	width: 100%;
+}
+.lg .link-btn:hover {
+	color: var(--fg);
+}
+
+/* Spinner inside loading button */
+.lg .spinner {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.35);
+	border-top-color: #fff;
+	animation: lg-spin 0.7s linear infinite;
+}
+@keyframes lg-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Footer / signup row */
+.lg .signup {
+	margin-top: 22px;
+	padding-top: 16px;
+	border-top: 1px solid var(--border);
+	text-align: center;
+	font-size: 12.5px;
+	color: var(--fg-muted);
+}
+.lg .signup a {
+	color: var(--accent);
+	font-weight: 500;
+	text-decoration: none;
+}
+.lg .signup a:hover {
+	text-decoration: underline;
+}
+
+.lg .legal {
+	margin-top: 18px;
+	text-align: center;
+	font-size: 11px;
+	color: var(--fg-faint);
+	line-height: 1.5;
+}
+.lg .legal a {
+	color: var(--fg-muted);
+	text-decoration: none;
+}
+.lg .legal a:hover {
+	color: var(--fg);
+	text-decoration: underline;
+}
+
+/* Back button on inner views */
+.lg .back-btn {
+	position: absolute;
+	top: -44px;
+	left: 0;
+	height: 28px;
+	padding: 0 10px 0 6px;
+	border-radius: 6px;
+	background: transparent;
+	border: 0;
+	color: var(--fg-muted);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font: inherit;
+	font-size: 12.5px;
+	transition:
+		background 0.12s,
+		color 0.12s;
+}
+.lg .back-btn:hover {
+	background: var(--bg-hover);
+	color: var(--fg);
+}
+
+/* Stack the auth surface so banners can sit above the card */
+.lg .auth-stack {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: 380px;
+	max-width: 100%;
+	position: relative;
+	z-index: 1;
+}

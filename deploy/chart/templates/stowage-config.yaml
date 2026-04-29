@@ -1,0 +1,39 @@
+{{- if .Values.stowage.enabled -}}
+{{- $base := dict
+    "server" (dict
+        "listen" ":8080"
+        "shutdown_timeout" "10s")
+    "log" (dict
+        "level" "info"
+        "format" "json")
+    "db" (dict
+        "driver" "sqlite"
+        "sqlite" (dict "path" "/data/stowage.db"))
+    "auth" (dict
+        "modes" (list "local")
+        "session" (dict
+            "lifetime" "8h"
+            "idle_timeout" "1h")
+        "local" (dict
+            "allow_self_registration" false
+            "require_admin_approval"  true))
+    "s3_proxy" (dict
+        "enabled" true
+        "listen"  ":8090"
+        "kubernetes" (dict
+            "enabled"   .Values.operator.enabled
+            "namespace" .Values.namespace))
+    "backends" (list)
+-}}
+{{- $merged := mergeOverwrite $base .Values.config -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stowage-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+data:
+  config.yaml: |
+{{ $merged | toYaml | indent 4 }}
+{{- end }}
