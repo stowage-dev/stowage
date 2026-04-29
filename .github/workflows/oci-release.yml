@@ -109,7 +109,7 @@ jobs:
 
       - name: Compute image labels
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # Per-arch builds push by digest only — tags are applied once,
@@ -176,7 +176,7 @@ jobs:
 
       - name: Compute image tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # Suppress the bare `:major` tag for v0.x.y — pre-1.0 has no stable API.
@@ -272,7 +272,7 @@ jobs:
 
       - name: Compute operator image labels
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
           labels: |
@@ -338,7 +338,7 @@ jobs:
 
       - name: Compute operator image tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
           # Same tag policy as the stowage image: semver + :latest on tag /
