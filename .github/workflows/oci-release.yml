@@ -67,7 +67,7 @@ jobs:
         working-directory: web
         run: bun run build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: web/dist
@@ -147,7 +147,7 @@ jobs:
           digest='${{ steps.build.outputs.digest }}'
           touch "/tmp/digests/${digest#sha256:}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.arch }}
           path: /tmp/digests/*
@@ -309,7 +309,7 @@ jobs:
           digest='${{ steps.build.outputs.digest }}'
           touch "/tmp/operator-digests/${digest#sha256:}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: operator-digests-${{ matrix.arch }}
           path: /tmp/operator-digests/*

@@ -25,7 +25,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: web/dist
@@ -83,7 +83,7 @@ jobs:
             ./cmd/stowage
           ls -lh "$out"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: stowage-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/stowage-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
