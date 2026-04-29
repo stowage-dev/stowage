@@ -1,0 +1,40 @@
+# Binaries
+/bin/
+/stowage
+/stowage.exe
+
+# Go build artefacts
+*.test
+*.out
+coverage.*
+private/
+# SvelteKit / Node
+web/node_modules/
+web/.svelte-kit/
+web/build/
+# The full SvelteKit static bundle is built by `make frontend`; only a
+# tiny stub index.html is checked in so `go:embed all:dist` works on a
+# clean clone.
+/web/dist/*
+!/web/dist/index.html
+
+# IDE
+.idea/
+.vscode/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local-only config / secrets
+*.local.yaml
+.env
+.env.*
+/stowage-demo.db-shm
+/stowage-demo.db-wal
+/stowage-demo.db
+/stowage.key
+
+# Local audit/scratch dir
+/.audit/

@@ -1,0 +1,62 @@
+{{- if .Values.networkPolicy.enabled -}}
+{{- if .Values.stowage.enabled }}
+# Stowage egress is intentionally permissive: the dashboard and embedded
+# proxy both fan out to whatever S3 endpoints operators configure (which
+# can be any HTTP(S) host on the internet) and OIDC providers do the same.
+# Locking egress down belongs in cluster-level NetworkPolicy, not here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stowage
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "stowage.dashboardSelector" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - {protocol: TCP, port: 8080}
+        - {protocol: TCP, port: 8090}
+{{- end }}
+{{- if and .Values.stowage.enabled .Values.operator.enabled }}
+---
+{{- end }}
+{{- if .Values.operator.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stowage-operator
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.operatorLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "stowage.operatorSelector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - {protocol: TCP, port: 9090}
+        - {protocol: TCP, port: 8081}
+    {{- if .Values.webhook.enabled }}
+        - {protocol: TCP, port: 9443}
+    {{- end }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # apiserver (usually ClusterIP, so no tighter target) + any S3 backend
+    # the operator administers via admin-signed bucket create / delete.
+    - ports:
+        - {protocol: TCP, port: 443}
+        - {protocol: TCP, port: 6443}
+{{- end }}
+{{- end }}

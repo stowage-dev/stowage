@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/stowage-dev/stowage/security/advisories/new
+    about: Report privately via GitHub Security Advisories. Do NOT open a public issue.
+
+  - name: Question or discussion
+    url: https://github.com/stowage-dev/stowage/discussions
+    about: For usage questions, design ideas, or open-ended discussion. Issues are for bugs and concrete feature requests.

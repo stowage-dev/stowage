@@ -1,0 +1,88 @@
+# Benchmark stack:
+#   - minio: capped at 1 CPU and 200 MiB so the comparison against
+#     stowage is apples-to-apples (same resource envelope on both)
+#   - stowage: capped at 1 CPU and 200 MiB
+#
+# Usage (from repo root):
+#   docker compose -f benchmarks/docker-compose.bench.yml up -d --build
+#   go run ./benchmarks -base http://localhost:18080 -password 'B3nchm@rk-Pa55w0rd'
+#   docker compose -f benchmarks/docker-compose.bench.yml down -v
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      # MinIO is also written in Go; same GOMEMLIMIT trick as stowage so
+      # GC pressure kicks in before the cgroup OOM-killer does.
+      GOMEMLIMIT: 180MiB
+    ports:
+      # Exposed so the MinIO-direct comparison bench can hit the S3 API
+      # without going through stowage. Picked 19000 to mirror the 18080
+      # we use for stowage and avoid clashing with a host-installed minio.
+      - "19000:9000"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc --version >/dev/null 2>&1 || curl -fsS http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Identical envelope to stowage — see commentary on the stowage
+    # service below for why both forms are set.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 200M
+    cpus: 1.0
+    mem_limit: 200m
+
+  stowage:
+    build:
+      context: ..
+      dockerfile: benchmarks/Dockerfile.bench
+    depends_on:
+      minio:
+        condition: service_healthy
+    ports:
+      - "18080:8080"
+      # Embedded S3 SigV4 proxy. Mirrors the 18080 mapping convention.
+      # The s3proxybench client targets this listener directly so the
+      # comparison against `miniobench` (port 19000) isolates the proxy
+      # overhead with the upstream MinIO held constant.
+      - "18090:8090"
+      # pprof listener — opt-in via STOWAGE_PPROF_LISTEN below. Bench
+      # only; never exposed in the standard deploy.
+      - "16060:6060"
+    environment:
+      STOWAGE_LOG_FORMAT: text
+      STOWAGE_LOG_LEVEL: warn
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      BENCH_ADMIN_USER: admin
+      BENCH_ADMIN_PASS: B3nchm@rk-Pa55w0rd
+      STOWAGE_PPROF_LISTEN: ":6060"
+      # Tell Go's GC about the cgroup limit so it triggers before the
+      # kernel SIGKILLs us. 180 MiB leaves ~20 MiB of headroom for
+      # off-heap allocations (stack, mmaps, sqlite WAL).
+      GOMEMLIMIT: 180MiB
+    volumes:
+      - stowage-data:/data
+    deploy:
+      resources:
+        limits:
+          # 1 CPU and 200 MiB, as requested.
+          cpus: "1.0"
+          memory: 200M
+    # docker compose `deploy.resources.limits` is honoured by `docker compose
+    # up` since v2.x even outside swarm. We also set the v2 short-form so
+    # older clients pick it up.
+    cpus: 1.0
+    mem_limit: 200m
+
+volumes:
+  minio-data: {}
+  stowage-data: {}

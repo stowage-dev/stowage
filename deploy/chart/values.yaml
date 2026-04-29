@@ -1,0 +1,64 @@
+# Stowage chart — deploys the dashboard, embedded S3 SigV4 proxy, and the
+# operator wired together in one namespace. Override only what you need;
+# every other knob is rendered with a working default by the templates.
+
+namespace: stowage-system
+
+image:
+  registry: ghcr.io/stowage-dev
+  tag: sha-75f9ca6
+  pullPolicy: IfNotPresent
+  # Names of existing dockerconfigjson Secrets in .Values.namespace to attach
+  # as imagePullSecrets on every Pod. The chart does not create these.
+  pullSecrets: []
+
+# Persistent volume that backs the SQLite store. Stowage runs as a single
+# replica (SQLite + in-process limiter), so RWO is sufficient.
+storage:
+  size: 1Gi
+  # Empty = cluster default StorageClass.
+  storageClassName: ""
+
+# Optional Ingress for the dashboard. Stowage expects to sit behind a
+# TLS-terminating proxy.
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: false
+
+# Verbatim YAML merged on top of the chart's generated stowage config.yaml.
+# Use this for OIDC, audit sampling, rate-limit overrides, host suffixes,
+# and any other knob the chart doesn't expose directly.
+config: {}
+
+# Override the AES-256 root key (32 bytes encoded as 64 hex chars or
+# 44-char base64). Empty = the chart generates one on first install and
+# preserves it across upgrades via `helm lookup`.
+secretKey: ""
+
+# Admission webhook for S3Backend / BucketClaim CRDs. Disabling skips
+# webhook + cert rendering entirely.
+webhook:
+  enabled: true
+  failurePolicy: Fail
+  selfSigned:
+    enabled: true
+    validityDays: 3650
+  certManager:
+    enabled: false
+    issuerRef:
+      kind: Issuer
+      name: ""
+  caBundle: ""
+
+# Per-component disable. Both default to on; flip one off to deploy the
+# other standalone (e.g. operator-only if stowage already runs elsewhere).
+stowage:
+  enabled: true
+operator:
+  enabled: true
+
+networkPolicy:
+  enabled: false

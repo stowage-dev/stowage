@@ -1,0 +1,128 @@
+@import 'tailwindcss';
+@import './lib/styles/stowage.css';
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	font-family: var(--stw-font-ui);
+	background: var(--stw-bg);
+	color: var(--stw-fg);
+}
+
+@keyframes stw-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes stw-zoom-in {
+	from {
+		opacity: 0;
+		transform: scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+@keyframes stw-slide-in-right {
+	from {
+		transform: translateX(12px);
+		opacity: 0;
+	}
+	to {
+		transform: none;
+		opacity: 1;
+	}
+}
+@keyframes stw-toast-in {
+	from {
+		transform: translate(-50%, 8px);
+		opacity: 0;
+	}
+	to {
+		transform: translate(-50%, 0);
+		opacity: 1;
+	}
+}
+
+:focus-visible {
+	outline: none;
+}
+
+/* ---- Responsive shell ---------------------------------------------------
+ * Breakpoint: 768px. Below it, the sidebar becomes an off-canvas drawer and
+ * a hamburger in the TopBar toggles it. Utility classes below are consumed
+ * by the shell (layout, TopBar, Sidebar, DetailDrawer, BucketBrowser).
+ */
+.stw-mobile-only {
+	display: none;
+}
+.stw-desktop-only {
+	display: initial;
+}
+
+/* Sidebar drawer wrapper: pass-through on desktop. */
+.stw-sidebar-slot {
+	display: contents;
+}
+
+/* Search box in TopBar: fixed widths on desktop, fluid on mobile. */
+.stw-topbar-search {
+	width: 320px;
+}
+.stw-topbar-search.wide {
+	width: 520px;
+}
+
+/* Fluid page padding for simple screens. */
+.stw-page-pad {
+	padding: clamp(12px, 3vw, 24px);
+}
+
+@media (max-width: 768px) {
+	.stw-mobile-only {
+		display: inline-flex;
+	}
+	.stw-desktop-only {
+		display: none !important;
+	}
+
+	.stw-sidebar-slot {
+		position: fixed;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		z-index: 50;
+		display: block;
+		transform: translateX(-100%);
+		transition: transform 200ms ease-out;
+		box-shadow: var(--stw-shadow-lg);
+	}
+	.stw-sidebar-slot.open {
+		transform: translateX(0);
+	}
+
+	.stw-sidebar-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 45;
+		background: rgba(0, 0, 0, 0.4);
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+	}
+
+	.stw-topbar-search,
+	.stw-topbar-search.wide {
+		width: auto;
+		flex: 1;
+		min-width: 0;
+	}
+}

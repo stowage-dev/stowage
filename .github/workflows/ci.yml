@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go (vet, test, staticcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Ensure frontend placeholder exists
+        run: |
+          mkdir -p web/dist
+          [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -race ./...
+
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+  envtest:
+    name: envtest (operator + s3proxy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Ensure frontend placeholder exists
+        run: |
+          mkdir -p web/dist
+          [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
+
+      # Pin kube-apiserver/etcd to the same minor as the operator's controller-runtime
+      # build target. setup-envtest caches binaries under ~/.local/share/kubebuilder-envtest.
+      - name: Install setup-envtest
+        run: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+      - name: Download kubebuilder assets
+        id: envtest
+        run: |
+          path=$("$(go env GOPATH)/bin/setup-envtest" use 1.32.0 -p path)
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Run envtest suite
+        env:
+          KUBEBUILDER_ASSETS: ${{ steps.envtest.outputs.path }}
+        run: go test -tags envtest -timeout 10m ./internal/operator/... ./internal/s3proxy/...
+
+  frontend:
+    name: SvelteKit (lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1'
+
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run build
+
+  docker:
+    name: Build & publish main image
+    runs-on: ubuntu-latest
+    needs: [go, envtest, frontend]
+    # Tag publishes are handled by oci-release.yml (multi-arch + signed).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  operator-docker:
+    name: Build & publish operator image
+    runs-on: ubuntu-latest
+    needs: [go, envtest]
+    # Tag/release publishes for the operator image are intentionally not
+    # wired up yet — see oci-release.yml for the stowage-image release flow,
+    # which will need a sibling matrix entry once we cut a v1 of the operator.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute operator image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-operator
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+
+      - name: Build and push operator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.operator
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=operator
+          cache-to: type=gha,mode=max,scope=operator

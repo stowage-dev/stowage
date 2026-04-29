@@ -1,0 +1,30 @@
+# Bench-only image: copies a pre-built static stowage binary into a tiny
+# alpine base. Building outside Docker avoids needing network access from
+# the build sandbox (which can't always reach the alpine package CDN) and
+# keeps the bench iteration loop fast. The binary is built with
+# CGO_ENABLED=0 + the pure-Go modernc.org/sqlite driver, so it runs on
+# alpine (or scratch) with no extra deps.
+#
+# Pre-build (run from repo root):
+#   CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+#       -o benchmarks/.bin/stowage ./cmd/stowage
+#
+# This is automated by benchmarks/run.sh.
+
+FROM alpine:3.20
+RUN addgroup -S stowage \
+ && adduser -S -G stowage -h /home/stowage stowage \
+ && mkdir -p /data /etc/stowage \
+ && chown -R stowage:stowage /data /home/stowage
+
+COPY benchmarks/.bin/stowage /usr/local/bin/stowage
+COPY benchmarks/config.bench.yaml /etc/stowage/config.yaml
+COPY benchmarks/entrypoint.sh /usr/local/bin/bench-entrypoint.sh
+RUN chmod +x /usr/local/bin/stowage /usr/local/bin/bench-entrypoint.sh
+
+USER stowage:stowage
+WORKDIR /data
+VOLUME ["/data"]
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/bench-entrypoint.sh"]

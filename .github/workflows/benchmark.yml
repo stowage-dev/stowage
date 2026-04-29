@@ -1,0 +1,172 @@
+name: Benchmark
+
+# Triggered when:
+#   - a release is published (gates the release on no perf regression)
+#   - a tag matching v* is pushed (catches regressions before the release
+#     workflow flips it to "published")
+#   - manually via the Actions tab (handy for refreshing the baseline)
+#
+# What it does:
+#   1. Builds a static stowage binary
+#   2. Spins up the same docker-compose stack we use for local benches
+#      (stowage + minio, both pinned to 1 CPU / 200 MiB)
+#   3. Runs benchmarks/bench.go against it, emitting JSON + markdown
+#   4. Runs benchmarks/check (a small Go tool) which diffs the new JSON
+#      against the committed benchmarks/baseline.json and exits non-zero
+#      if any endpoint regressed beyond the configured tolerances
+#   5. Uploads results.md / results.json / results-comparison.md as
+#      workflow artifacts so a maintainer can inspect the run
+#
+# How to refresh the baseline (e.g. after a deliberate perf change):
+#   - Run this workflow via "Run workflow" with refresh-baseline=true,
+#     download the produced results.json artifact, commit it as
+#     benchmarks/baseline.json on a PR. The next run will compare
+#     against the new floor.
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      refresh-baseline:
+        description: 'Skip the regression gate (useful when intentionally re-baselining)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+      duration:
+        description: 'Per-endpoint bench duration'
+        required: false
+        default: '15s'
+      concurrency:
+        description: 'Concurrent workers per endpoint'
+        required: false
+        default: '16'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: Run perf benchmark + regression gate
+    runs-on: ubuntu-latest
+    # The bench is short but adding margin for image pulls + warmups.
+    timeout-minutes: 20
+
+    env:
+      BENCH_DURATION: ${{ inputs.duration || '15s' }}
+      BENCH_CONCURRENCY: ${{ inputs.concurrency || '16' }}
+      BENCH_ADMIN_PASS: B3nchm@rk-Pa55w0rd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Ensure frontend placeholder exists
+        # The router embeds web/dist; the bench never serves SPA HTML, so
+        # an empty placeholder satisfies the //go:embed directive.
+        run: |
+          mkdir -p web/dist
+          [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
+
+      - name: Build static stowage binary
+        run: |
+          mkdir -p benchmarks/.bin
+          CGO_ENABLED=0 go build \
+            -trimpath \
+            -ldflags="-s -w" \
+            -o benchmarks/.bin/stowage \
+            ./cmd/stowage
+          ls -lh benchmarks/.bin/stowage
+
+      - name: Start bench stack (stowage + minio, both 1 CPU / 200 MiB)
+        run: |
+          docker compose -f benchmarks/docker-compose.bench.yml up -d --build
+          # Wait for stowage /readyz, then verify minio is healthy too.
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:18080/readyz >/dev/null 2>&1; then
+              echo "stowage is ready"
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:19000/minio/health/live -o /dev/null \
+            -w "minio: %%{http_code}\n"
+          docker compose -f benchmarks/docker-compose.bench.yml ps
+
+      - name: Run stowage benchmark
+        run: |
+          go run ./benchmarks \
+            -base http://localhost:18080 \
+            -username admin \
+            -password "$BENCH_ADMIN_PASS" \
+            -duration "$BENCH_DURATION" \
+            -concurrency "$BENCH_CONCURRENCY" \
+            -login-duration 30s \
+            -login-concurrency 1 \
+            -output benchmarks/results.md \
+            -json benchmarks/results.json
+
+      - name: Run MinIO-direct comparison
+        # Best-effort — failure here doesn't break the gate, the
+        # comparison report is informational. The seed object was
+        # created by the stowage bench above.
+        continue-on-error: true
+        run: |
+          go run ./benchmarks/miniobench \
+            -endpoint http://localhost:19000 \
+            -bucket bench \
+            -object bench/probe.bin \
+            -duration "$BENCH_DURATION" \
+            -concurrency "$BENCH_CONCURRENCY" \
+            -output benchmarks/results-minio.md
+
+      - name: Print bench results
+        run: cat benchmarks/results.md
+
+      - name: Regression gate (vs benchmarks/baseline.json)
+        if: ${{ inputs.refresh-baseline != 'true' }}
+        # Exits non-zero — and writes a markdown table to the workflow
+        # summary — if any endpoint dropped throughput by >30% or
+        # ballooned p99 by >100% vs the committed baseline. Tolerances
+        # are intentionally loose so CI noise doesn't trigger false
+        # alarms; tighten via flags if needed.
+        run: |
+          go run ./benchmarks/check \
+            -current benchmarks/results.json \
+            -baseline benchmarks/baseline.json \
+            -summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Note skipped gate (refresh-baseline run)
+        if: ${{ inputs.refresh-baseline == 'true' }}
+        run: |
+          echo "## Regression gate skipped (refresh-baseline=true)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download the \`bench-results\` artifact and commit results.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "as benchmarks/baseline.json to make this run the new floor." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tear down bench stack
+        if: always()
+        run: docker compose -f benchmarks/docker-compose.bench.yml down -v
+
+      - name: Upload bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            benchmarks/results.md
+            benchmarks/results.json
+            benchmarks/results-minio.md
+          if-no-files-found: warn
+          retention-days: 30

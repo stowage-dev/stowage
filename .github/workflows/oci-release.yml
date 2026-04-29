@@ -1,0 +1,397 @@
+name: OCI Release
+
+on:
+  push:
+    branches: ['main']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: oci-release-${{ inputs.tag || github.ref }}
+  # Cancel superseded runs on main-branch pushes so rapid commits don't queue
+  # behind each other; tag pushes and manual dispatches still queue to avoid
+  # cancelling a half-published release.
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  OPERATOR_IMAGE_NAME: ${{ github.repository }}-operator
+
+jobs:
+  resolve:
+    name: Resolve release ref
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.r.outputs.name }}
+    steps:
+      - id: r
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${GITHUB_REF_TYPE}" = "branch" ]; then
+            # Branch pushes (main) — use the commit SHA so labels and the
+            # checkout ref both pin to the exact dev build.
+            echo "name=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    name: Build frontend bundle
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1'
+
+      - name: Install deps
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Build SvelteKit static bundle
+        working-directory: web
+        run: bun run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: [resolve, frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Per-arch builds push by digest only — tags are applied once,
+          # against the manifest list, in the merge job below.
+          labels: |
+            org.opencontainers.image.title=stowage
+            org.opencontainers.image.description=OIDC-authenticated dashboard for any S3-compatible backend
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+            org.opencontainers.image.vendor=Damian van der Merwe
+            org.opencontainers.image.version=${{ needs.resolve.outputs.ref }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FRONTEND=prebuilt
+          provenance: mode=max
+          sbom: true
+          # Per-arch cache scopes so the two parallel builds don't collide.
+          cache-from: type=gha,scope=build-${{ matrix.arch }}
+          cache-to: type=gha,scope=build-${{ matrix.arch }},mode=max
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge manifest, sign, attest
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Suppress the bare `:major` tag for v0.x.y — pre-1.0 has no stable API.
+          # Semver / :latest only fire for tag pushes and workflow_dispatch;
+          # main-branch pushes publish a single floating `:dev` tag.
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.resolve.outputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=semver,pattern={{major}},value=${{ needs.resolve.outputs.ref }},enable=${{ (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && !startsWith(needs.resolve.outputs.ref, 'v0.') }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Resolve manifest digest
+        id: digest
+        run: |
+          DIGEST=$(docker buildx imagetools inspect \
+            "${REGISTRY}/${IMAGE_NAME}:${{ steps.meta.outputs.version }}" \
+            --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign manifest list (cosign keyless)
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      - name: Job summary
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "## Published OCI image"
+            echo ""
+            echo "**Digest:** \`${DIGEST}\`"
+            echo ""
+            echo "**Platforms:** linux/amd64, linux/arm64"
+            echo ""
+            echo "**Tags:**"
+            printf -- '- `%s`\n' ${TAGS}
+            echo ""
+            echo "Verify with:"
+            echo ""
+            echo '```sh'
+            echo "cosign verify ${REGISTRY}/${IMAGE_NAME}@${DIGEST} \\"
+            echo "  --certificate-identity-regexp='^https://github.com/${{ github.repository }}/' \\"
+            echo "  --certificate-oidc-issuer=https://token.actions.githubusercontent.com"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Operator image
+  #
+  # Built and tagged in lockstep with stowage so a `vX.Y.Z` git tag publishes
+  # both. The operator Dockerfile is self-contained (no SvelteKit bundle),
+  # so its build does not depend on the `frontend` job.
+
+  operator-build:
+    name: Build operator ${{ matrix.platform }}
+    needs: [resolve]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute operator image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          labels: |
+            org.opencontainers.image.title=stowage-operator
+            org.opencontainers.image.description=Kubernetes operator for stowage (BucketClaim + S3Backend reconcilers)
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/operator/architecture.md
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+            org.opencontainers.image.vendor=Damian van der Merwe
+            org.opencontainers.image.version=${{ needs.resolve.outputs.ref }}
+
+      - name: Build and push operator image by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.operator
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.resolve.outputs.ref }}
+          provenance: mode=max
+          sbom: true
+          # Per-arch cache scopes, distinct from the stowage build scopes so
+          # the parallel builds don't fight for the same cache key.
+          cache-from: type=gha,scope=operator-build-${{ matrix.arch }}
+          cache-to: type=gha,scope=operator-build-${{ matrix.arch }},mode=max
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/operator-digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/operator-digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-digests-${{ matrix.arch }}
+          path: /tmp/operator-digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  operator-merge:
+    name: Merge operator manifest, sign
+    needs: [resolve, operator-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/operator-digests
+          pattern: operator-digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute operator image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          # Same tag policy as the stowage image: semver + :latest on tag /
+          # workflow_dispatch, single :dev floating tag on main pushes.
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.resolve.outputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.ref }},enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=semver,pattern={{major}},value=${{ needs.resolve.outputs.ref }},enable=${{ (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && !startsWith(needs.resolve.outputs.ref, 'v0.') }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+            type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Create operator manifest list and push
+        working-directory: /tmp/operator-digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Resolve operator manifest digest
+        id: digest
+        run: |
+          DIGEST=$(docker buildx imagetools inspect \
+            "${REGISTRY}/${OPERATOR_IMAGE_NAME}:${{ steps.meta.outputs.version }}" \
+            --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign operator manifest list (cosign keyless)
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: cosign sign --yes "${REGISTRY}/${OPERATOR_IMAGE_NAME}@${DIGEST}"
+
+      - name: Job summary
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "## Published operator OCI image"
+            echo ""
+            echo "**Digest:** \`${DIGEST}\`"
+            echo ""
+            echo "**Platforms:** linux/amd64, linux/arm64"
+            echo ""
+            echo "**Tags:**"
+            printf -- '- `%s`\n' ${TAGS}
+            echo ""
+            echo "Verify with:"
+            echo ""
+            echo '```sh'
+            echo "cosign verify ${REGISTRY}/${OPERATOR_IMAGE_NAME}@${DIGEST} \\"
+            echo "  --certificate-identity-regexp='^https://github.com/${{ github.repository }}/' \\"
+            echo "  --certificate-oidc-issuer=https://token.actions.githubusercontent.com"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,43 @@
+{{- if .Values.stowage.enabled -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stowage
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+{{- if .Values.operator.enabled }}
+---
+# When the operator is co-deployed, stowage's embedded SigV4 proxy reads
+# operator-written virtual-credential / anonymous-binding Secrets via an
+# in-cluster informer. The informer needs read access on Secrets in the
+# operator namespace — namespaced, not cluster-wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: stowage
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: stowage
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: stowage
+subjects:
+  - kind: ServiceAccount
+    name: stowage
+    namespace: {{ .Values.namespace }}
+{{- end }}
+{{- end }}

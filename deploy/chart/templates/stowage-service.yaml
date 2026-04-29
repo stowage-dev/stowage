@@ -1,0 +1,23 @@
+{{- if .Values.stowage.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: stowage
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "stowage.dashboardSelector" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    # The proxy port is also the URL the operator stamps into consumer
+    # Secrets — see stowage.proxyEndpointURL in _helpers.tpl. Keep the
+    # service-port and target-port equal so the URL stays stable.
+    - name: s3
+      port: 8090
+      targetPort: s3
+{{- end }}
