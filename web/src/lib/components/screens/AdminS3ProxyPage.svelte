@@ -3,7 +3,7 @@
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { Plus, Trash2, RotateCw, KeyRound, Globe, Cloud, ServerCog } from 'lucide-svelte';
+	import { Plus, Trash2, RotateCw, KeyRound, Globe, Cloud, ServerCog, PowerOff } from 'lucide-svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
@@ -25,16 +25,24 @@
 		initialCreds: S3CredentialView[];
 		initialAnon: S3AnonymousBinding[];
 		initialError: string | null;
+		initialDisabled?: boolean;
 		backends: Backend[];
 	}
 
-	let { initialCreds, initialAnon, initialError, backends }: Props = $props();
+	let {
+		initialCreds,
+		initialAnon,
+		initialError,
+		initialDisabled = false,
+		backends
+	}: Props = $props();
 
 	type Tab = 'credentials' | 'anonymous';
 
 	let creds = $state<S3CredentialView[]>(untrack(() => initialCreds));
 	let bindings = $state<S3AnonymousBinding[]>(untrack(() => initialAnon));
 	let error = $state<string | null>(untrack(() => initialError));
+	let disabled = $state<boolean>(untrack(() => initialDisabled));
 	let tab = $state<Tab>('credentials');
 	let q = $state('');
 	let busy = $state(false);
@@ -67,8 +75,13 @@
 			const [c, b] = await Promise.all([api.listS3ProxyCredentials(), api.listS3ProxyAnonymous()]);
 			creds = c;
 			bindings = b;
+			disabled = false;
 		} catch (err) {
-			error = err instanceof ApiException ? err.message : 'Failed to load.';
+			if (err instanceof ApiException && err.code === 's3_proxy_disabled') {
+				disabled = true;
+			} else {
+				error = err instanceof ApiException ? err.message : 'Failed to load.';
+			}
 		} finally {
 			busy = false;
 		}
@@ -142,7 +155,7 @@
 	];
 
 	onMount(() => {
-		void refresh();
+		if (!disabled) void refresh();
 	});
 </script>
 
@@ -159,47 +172,65 @@
 			/>
 		{/snippet}
 		{#snippet actions()}
-			{#snippet refreshIcon()}<RotateCw size={12} strokeWidth={1.7} />{/snippet}
-			<Button size="sm" icon={refreshIcon} onclick={() => refresh()} disabled={busy}>
-				Refresh
-			</Button>
-			{#snippet plusIcon()}<Plus size={13} strokeWidth={1.7} />{/snippet}
-			{#if tab === 'credentials'}
-				<Button icon={plusIcon} variant="primary" onclick={() => (showCreateCred = true)}>
-					New credential
+			{#if !disabled}
+				{#snippet refreshIcon()}<RotateCw size={12} strokeWidth={1.7} />{/snippet}
+				<Button size="sm" icon={refreshIcon} onclick={() => refresh()} disabled={busy}>
+					Refresh
 				</Button>
-			{:else}
-				<Button icon={plusIcon} variant="primary" onclick={() => (showCreateAnon = true)}>
-					New binding
-				</Button>
+				{#snippet plusIcon()}<Plus size={13} strokeWidth={1.7} />{/snippet}
+				{#if tab === 'credentials'}
+					<Button icon={plusIcon} variant="primary" onclick={() => (showCreateCred = true)}>
+						New credential
+					</Button>
+				{:else}
+					<Button icon={plusIcon} variant="primary" onclick={() => (showCreateAnon = true)}>
+						New binding
+					</Button>
+				{/if}
 			{/if}
 		{/snippet}
 	</PageHeader>
 
-	<div class="flex flex-wrap items-center gap-3">
-		<Segmented
-			value={tab}
-			onchange={(v) => (tab = v)}
-			options={[
-				{ value: 'credentials' as const, label: 'Virtual credentials' },
-				{ value: 'anonymous' as const, label: 'Anonymous bindings' }
-			]}
-		/>
-		<SearchField
-			bind:value={q}
-			placeholder={tab === 'credentials'
-				? 'Filter by key, bucket, claim…'
-				: 'Filter by backend or bucket…'}
-			width="320px"
-			size="sm"
-		/>
-	</div>
+	{#if disabled}
+		{#snippet powerIcon()}<PowerOff size={22} strokeWidth={1.7} />{/snippet}
+		<EmptyState variant="card" icon={powerIcon} title="The S3 proxy is disabled.">
+			<div class="max-w-[640px] text-center">
+				The embedded SigV4 proxy is the master switch for virtual credentials and
+				anonymous bucket bindings. While it's off, the dashboard can't list, mint,
+				or revoke either — and tenant SDKs hitting the proxy endpoint will get
+				connection failures.
+			</div>
+			<div class="max-w-[640px] text-center">
+				Set <code>s3_proxy.enabled: true</code> (and a <code>s3_proxy.listen</code>
+				address) in your stowage config, then restart the server. See
+				<code>docs/reference/config.md</code> for the full surface.
+			</div>
+		</EmptyState>
+	{:else}
+		<div class="flex flex-wrap items-center gap-3">
+			<Segmented
+				value={tab}
+				onchange={(v) => (tab = v)}
+				options={[
+					{ value: 'credentials' as const, label: 'Virtual credentials' },
+					{ value: 'anonymous' as const, label: 'Anonymous bindings' }
+				]}
+			/>
+			<SearchField
+				bind:value={q}
+				placeholder={tab === 'credentials'
+					? 'Filter by key, bucket, claim…'
+					: 'Filter by backend or bucket…'}
+				width="320px"
+				size="sm"
+			/>
+		</div>
 
-	{#if error}
-		<Banner variant="err" role="alert">{error}</Banner>
-	{/if}
+		{#if error}
+			<Banner variant="err" role="alert">{error}</Banner>
+		{/if}
 
-	{#if tab === 'credentials'}
+		{#if tab === 'credentials'}
 		{#if creds.length === 0 && !error}
 			{#snippet keyIcon()}<KeyRound size={22} strokeWidth={1.7} />{/snippet}
 			<EmptyState variant="card" icon={keyIcon} title="No virtual credentials yet.">
@@ -329,6 +360,7 @@
 				</td>
 			{/snippet}
 		</DataTable>
+	{/if}
 	{/if}
 </div>
 
