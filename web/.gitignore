@@ -8,10 +8,10 @@ node_modules
 /.svelte-kit
 /build
 
-# SvelteKit static-adapter output. We commit the placeholder index.html
-# so `go build` works on a fresh clone without first running `bun run build`.
-/dist/*
-!/dist/index.html
+# SvelteKit static-adapter output. CI (and local helpers) scaffold a
+# placeholder index.html when the bundle is absent, so nothing under
+# /dist/ is tracked.
+/dist/
 
 # OS
 .DS_Store

@@ -12,11 +12,10 @@ private/
 web/node_modules/
 web/.svelte-kit/
 web/build/
-# The full SvelteKit static bundle is built by `make frontend`; only a
-# tiny stub index.html is checked in so `go:embed all:dist` works on a
-# clean clone.
-/web/dist/*
-!/web/dist/index.html
+# The full SvelteKit static bundle is built by `make frontend`. CI and
+# local builds scaffold a stub index.html when the bundle is absent, so
+# nothing under web/dist/ is tracked.
+/web/dist/
 
 # IDE
 .idea/

@@ -12,5 +12,6 @@
 	initialCreds={data.credentials}
 	initialAnon={data.bindings}
 	initialError={data.error}
+	initialDisabled={data.disabled}
 	backends={data.backends}
 />
