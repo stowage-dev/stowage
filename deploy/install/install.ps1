@@ -25,6 +25,14 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Invoke-WebRequest is dramatically slower with the progress bar enabled
+# (it repaints on every chunk). Disable it for a clean, fast download.
+$ProgressPreference = 'SilentlyContinue'
+
+# Match the OCI image's default CMD so `irm | iex` with no args does
+# something useful instead of printing the binary's help.
+if (-not $Arguments) { $Arguments = @('quickstart') }
+
 function Fail([string]$msg) {
   Write-Error "stowage-install: $msg"
   exit 1

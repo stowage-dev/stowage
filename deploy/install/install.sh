@@ -32,6 +32,12 @@ fi
 err() { printf 'stowage-install: %s\n' "$*" >&2; exit 1; }
 log() { printf '==> %s\n' "$*"; }
 
+# Match the OCI image's default CMD so `curl | sh` with no args does
+# something useful instead of printing the binary's help.
+if [ $# -eq 0 ]; then
+  set -- quickstart
+fi
+
 # Prefer the published OCI image if Docker is installed and the daemon is
 # reachable. `docker info` confirms reachability — being on PATH isn't enough.
 if [ "${STOWAGE_NO_DOCKER:-0}" != "1" ] \
