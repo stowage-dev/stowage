@@ -12,6 +12,13 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      go-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: /web
@@ -24,6 +31,17 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      npm-production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      npm-development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
@@ -35,6 +53,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      actions-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: /deploy/docker
@@ -46,3 +68,7 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      docker-all:
+        patterns:
+          - "*"
