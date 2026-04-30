@@ -8,9 +8,8 @@ Where things live in the Stowage repository. Source of truth:
 [`CLAUDE.md`](https://github.com/stowage-dev/stowage/blob/main/CLAUDE.md).
 
 ```
-cmd/stowage/                CLI entrypoint for the dashboard + S3 proxy:
-                            serve | quickstart | create-admin | hash-password
-cmd/operator/               CLI entrypoint for the optional Kubernetes operator
+cmd/stowage/                CLI entrypoint:
+                            serve | operator | quickstart | create-admin | hash-password
 internal/api/               chi router + HTTP handlers
 internal/auth/              sessions, CSRF, rate limit, password hashing,
                             proxy-trust gate, oidc/
@@ -33,10 +32,12 @@ internal/s3proxy/           embedded S3 SigV4 proxy: server + sources
                             CRUD types
 internal/store/             Store interface + sqlite/ implementation
                             (append-only migrations)
-internal/operator/          operator-only Kubernetes code:
+internal/operator/          Kubernetes operator code (embedded in the main
+                            binary; opt-in via operator.enabled in config):
                             api/v1alpha1/  CRDs (S3Backend, BucketClaim)
                             controller/    reconcilers
                             credentials/   admin Secret resolver, VC generator
+                            manager/       controller-runtime manager assembly
                             vcstore/       Secret writer (operator side)
                             webhook/       admission validators
                             backend/       k8s-side bucket lifecycle

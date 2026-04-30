@@ -21,7 +21,39 @@ type Config struct {
 	Quotas    QuotasConfig    `yaml:"quotas"`
 	RateLimit RateLimitConfig `yaml:"ratelimit"`
 	S3Proxy   S3ProxyConfig   `yaml:"s3_proxy"`
+	Operator  OperatorConfig  `yaml:"operator"`
 	Audit     AuditConfig     `yaml:"audit"`
+}
+
+// OperatorConfig opts the binary into running the embedded controller-runtime
+// manager that reconciles S3Backend / BucketClaim CRs and serves their
+// admission webhooks. Disabled by default — opting in requires a working
+// kubeconfig (in-cluster or explicit path) and the CRDs already installed.
+type OperatorConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// LeaderElection ensures a single active reconciler when the binary is
+	// scaled to multiple replicas. Safe to leave on with one replica.
+	LeaderElection   bool   `yaml:"leader_election"`
+	LeaderElectionID string `yaml:"leader_election_id"`
+	// Kubeconfig is an optional path to a kubeconfig file. Empty means
+	// in-cluster configuration.
+	Kubeconfig string `yaml:"kubeconfig"`
+	// MetricsAddr is the bind address for controller-runtime's own metrics
+	// listener. Empty disables it; the main /metrics endpoint is unaffected.
+	MetricsAddr string `yaml:"metrics_addr"`
+	// OpsNamespace is where the operator writes virtual-credential and
+	// anonymous-binding Secrets. Must match s3_proxy.kubernetes.namespace.
+	OpsNamespace string `yaml:"ops_namespace"`
+	// ProxyURL is the in-cluster URL of the stowage S3 proxy. The operator
+	// embeds it in consumer Secrets so workloads know where to send traffic.
+	ProxyURL string                `yaml:"proxy_url"`
+	Webhook  OperatorWebhookConfig `yaml:"webhook"`
+}
+
+type OperatorWebhookConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Port    int    `yaml:"port"`
+	CertDir string `yaml:"cert_dir"`
 }
 
 // AuditConfig controls what events the audit recorder persists. The
@@ -273,6 +305,17 @@ func Defaults() Config {
 				Namespace: "stowage-system",
 			},
 		},
+		Operator: OperatorConfig{
+			LeaderElection:   true,
+			LeaderElectionID: "stowage.broker.stowage.io",
+			OpsNamespace:     "stowage-system",
+			ProxyURL:         "http://stowage-proxy.stowage-system.svc.cluster.local:8080",
+			Webhook: OperatorWebhookConfig{
+				Enabled: true,
+				Port:    9443,
+				CertDir: "/etc/stowage/webhook/certs",
+			},
+		},
 		Audit: AuditConfig{
 			Sampling: AuditSamplingConfig{
 				ProxySuccessReadRate: 0.0, // skip successful proxy reads by default
@@ -355,6 +398,19 @@ func (c Config) validate() error {
 		}
 		if c.S3Proxy.Listen == c.Server.Listen {
 			return fmt.Errorf("s3_proxy.listen must differ from server.listen (both set to %q)", c.S3Proxy.Listen)
+		}
+	}
+	if c.Operator.Enabled {
+		if strings.TrimSpace(c.Operator.OpsNamespace) == "" {
+			return fmt.Errorf("operator.ops_namespace is required when operator.enabled is true")
+		}
+		if c.Operator.Webhook.Enabled {
+			if c.Operator.Webhook.Port <= 0 || c.Operator.Webhook.Port > 65535 {
+				return fmt.Errorf("operator.webhook.port must be 1-65535")
+			}
+			if strings.TrimSpace(c.Operator.Webhook.CertDir) == "" {
+				return fmt.Errorf("operator.webhook.cert_dir is required when operator.webhook.enabled is true")
+			}
 		}
 	}
 	return nil

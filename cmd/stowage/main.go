@@ -16,6 +16,7 @@ import (
 
 	"github.com/stowage-dev/stowage/internal/auth"
 	"github.com/stowage-dev/stowage/internal/config"
+	opmgr "github.com/stowage-dev/stowage/internal/operator/manager"
 	"github.com/stowage-dev/stowage/internal/quickstart"
 	"github.com/stowage-dev/stowage/internal/server"
 	"github.com/stowage-dev/stowage/internal/store/sqlite"
@@ -37,6 +38,8 @@ func run(args []string) error {
 	switch cmd {
 	case "serve":
 		return runServe(rest)
+	case "operator":
+		return runOperator(rest)
 	case "quickstart":
 		return runQuickstart(rest)
 	case "create-admin":
@@ -57,6 +60,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  serve           Run the dashboard server")
+	fmt.Fprintln(os.Stderr, "  operator        Run the operator manager only (no dashboard, no S3 proxy)")
 	fmt.Fprintln(os.Stderr, "  quickstart      Download MinIO into ./data and run stowage against it")
 	fmt.Fprintln(os.Stderr, "  create-admin    Create the first local admin user")
 	fmt.Fprintln(os.Stderr, "  hash-password   Print an argon2id hash for a password")
@@ -96,6 +100,58 @@ func runServe(args []string) error {
 		return err
 	}
 	logger.Info("stowage stopped")
+	return nil
+}
+
+// runOperator runs only the controller-runtime manager, with no HTTP
+// listeners or dashboard wiring. Intended for headless deployments that
+// want the reconciler/webhook surface separately from the dashboard.
+func runOperator(args []string) error {
+	fs := flag.NewFlagSet("operator", flag.ContinueOnError)
+	configPath := fs.String("config", "", "path to YAML config file (env vars override)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := newLogger(cfg.Log)
+	slog.SetDefault(logger)
+
+	// "stowage operator" implies the operator runs even when the YAML did
+	// not opt in. Forcing Enabled=true here lets the same config file drive
+	// both subcommands without requiring two files.
+	if !cfg.Operator.Enabled {
+		cfg.Operator.Enabled = true
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	logger.Info("stowage operator starting",
+		"leader_election", cfg.Operator.LeaderElection,
+		"webhook_enabled", cfg.Operator.Webhook.Enabled,
+		"ops_namespace", cfg.Operator.OpsNamespace,
+	)
+	if err := opmgr.Start(ctx, opmgr.Config{
+		LeaderElection:   cfg.Operator.LeaderElection,
+		LeaderElectionID: cfg.Operator.LeaderElectionID,
+		Kubeconfig:       cfg.Operator.Kubeconfig,
+		MetricsAddr:      cfg.Operator.MetricsAddr,
+		OpsNamespace:     cfg.Operator.OpsNamespace,
+		ProxyURL:         cfg.Operator.ProxyURL,
+		Webhook: opmgr.WebhookConfig{
+			Enabled: cfg.Operator.Webhook.Enabled,
+			Port:    cfg.Operator.Webhook.Port,
+			CertDir: cfg.Operator.Webhook.CertDir,
+		},
+	}, logger); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	logger.Info("stowage operator stopped")
 	return nil
 }
 

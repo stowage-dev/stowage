@@ -1,16 +1,12 @@
 BINARY          := stowage
 CMD             := ./cmd/stowage
-OPERATOR_BINARY := stowage-operator
-OPERATOR_CMD    := ./cmd/operator
 BIN_DIR         := bin
 
-.PHONY: help build build-operator build-all run test envtest envtest-assets vet lint tidy clean docker docker-operator frontend
+.PHONY: help build run test envtest envtest-assets vet lint tidy clean docker frontend
 
 help:
 	@echo "Targets:"
 	@echo "  build           build the stowage binary into $(BIN_DIR)/"
-	@echo "  build-operator  build the stowage operator binary into $(BIN_DIR)/"
-	@echo "  build-all       build both binaries"
 	@echo "  run             build and run 'stowage serve'"
 	@echo "  test            go test ./..."
 	@echo "  envtest         go test -tags envtest ./... (operator + s3proxy)"
@@ -20,18 +16,11 @@ help:
 	@echo "  tidy            go mod tidy"
 	@echo "  frontend        bun install + bun run build in web/"
 	@echo "  docker          build the production stowage Docker image"
-	@echo "  docker-operator build the stowage operator Docker image"
 	@echo "  clean           remove $(BIN_DIR)/"
 
 build:
 	@mkdir -p $(BIN_DIR)
 	go build -trimpath -o $(BIN_DIR)/$(BINARY) $(CMD)
-
-build-operator:
-	@mkdir -p $(BIN_DIR)
-	go build -trimpath -o $(BIN_DIR)/$(OPERATOR_BINARY) $(OPERATOR_CMD)
-
-build-all: build build-operator
 
 run: build
 	$(BIN_DIR)/$(BINARY) serve --config config.demo.yaml
@@ -68,9 +57,6 @@ frontend:
 
 docker:
 	docker build -f deploy/docker/Dockerfile -t stowage:dev .
-
-docker-operator:
-	docker build -f deploy/docker/Dockerfile.operator -t stowage-operator:dev .
 
 clean:
 	rm -rf $(BIN_DIR)
