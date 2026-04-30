@@ -38,7 +38,6 @@ spec:
 | `spec.tls.insecureSkipVerify` | no | false | Skip TLS verify. Don't enable in production. |
 | `spec.tls.caBundleSecretRef` | no | — | Custom CA bundle Secret. Defaults to `key=ca.crt`. |
 | `spec.bucketNameTemplate` | no | `{{ .Namespace }}-{{ .Name }}` | Go text/template applied to `BucketClaim` to compute the real bucket name. Vars: `.Namespace`, `.Name`, `.Hash`. |
-| `spec.quobjectsStorageSpace` | no | "" | Niche: prefixes the access key as `<storageSpace>:<rawAccessKey>` on outbound calls. Affects admin calls only. |
 
 ## Status
 

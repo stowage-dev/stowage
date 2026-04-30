@@ -48,9 +48,6 @@ spec:
                   type: string
                   enum: [path, virtual]
                   default: path
-                quobjectsStorageSpace:
-                  type: string
-                  pattern: ^[^\s]+$
                 adminCredentialsSecretRef:
                   type: object
                   required: [name, namespace]

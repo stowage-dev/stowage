@@ -58,7 +58,6 @@ func (r *S3BackendReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		Namespace:      b.Spec.AdminCredentialsSecretRef.Namespace,
 		AccessKeyField: b.Spec.AdminCredentialsSecretRef.AccessKeyField,
 		SecretKeyField: b.Spec.AdminCredentialsSecretRef.SecretKeyField,
-		StorageSpace:   b.Spec.QuObjectsStorageSpace,
 	})
 	if err != nil {
 		logger.Info("admin credentials unavailable", "err", err)

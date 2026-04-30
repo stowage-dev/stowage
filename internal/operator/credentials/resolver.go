@@ -15,15 +15,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Admin holds the resolved backend admin credentials. The AccessKeyID is
-// presented to the backend after the storage-space prefix has been applied.
+// Admin holds the resolved backend admin credentials.
 type Admin struct {
 	AccessKeyID     string
 	SecretAccessKey string
 }
 
-// Resolver loads admin credentials from a Secret and applies a QuObjects-style
-// "<storageSpace>:<rawAccessKey>" prefix when requested.
+// Resolver loads admin credentials from a Secret.
 type Resolver struct {
 	Client client.Client
 }
@@ -34,7 +32,6 @@ type AdminSecretRef struct {
 	Namespace      string
 	AccessKeyField string
 	SecretKeyField string
-	StorageSpace   string
 }
 
 func (r *Resolver) Resolve(ctx context.Context, ref AdminSecretRef) (Admin, error) {
@@ -60,13 +57,8 @@ func (r *Resolver) Resolve(ctx context.Context, ref AdminSecretRef) (Admin, erro
 		return Admin{}, fmt.Errorf("admin secret %s missing key %q", nsn, ref.SecretKeyField)
 	}
 
-	ak := strings.TrimSpace(string(rawAK))
-	if ref.StorageSpace != "" && !strings.Contains(ak, ":") {
-		ak = ref.StorageSpace + ":" + ak
-	}
-
 	return Admin{
-		AccessKeyID:     ak,
+		AccessKeyID:     strings.TrimSpace(string(rawAK)),
 		SecretAccessKey: strings.TrimSpace(string(rawSK)),
 	}, nil
 }

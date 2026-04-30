@@ -57,13 +57,6 @@ type S3BackendSpec struct {
 	// +kubebuilder:default=path
 	AddressingStyle AddressingStyle `json:"addressingStyle,omitempty"`
 
-	// QuObjectsStorageSpace, if set, causes the admin access key to be sent
-	// as "<storageSpace>:<rawAccessKey>". This only affects outbound calls to
-	// the backend; virtual credentials never carry this prefix.
-	// +optional
-	// +kubebuilder:validation:Pattern=`^[^\s]+$`
-	QuObjectsStorageSpace string `json:"quobjectsStorageSpace,omitempty"`
-
 	AdminCredentialsSecretRef AdminCredentialsRef `json:"adminCredentialsSecretRef"`
 
 	// +optional
