@@ -237,6 +237,10 @@
 	background: var(--stw-err);
 	border-color: var(--stw-err);
 }
+.stw-btn--danger:hover {
+	background: color-mix(in oklch, var(--stw-err) 80%, black);
+	border-color: color-mix(in oklch, var(--stw-err) 80%, black);
+}
 
 .stw-btn--sm {
 	height: 24px;
