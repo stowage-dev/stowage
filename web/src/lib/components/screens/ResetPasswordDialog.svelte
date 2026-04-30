@@ -73,11 +73,11 @@
 
 		<Banner variant="info">
 			{#if isSelf}
-				Your other sessions will be signed out. This session stays active and you won't be asked
-				to change the password again.
+				Your other sessions will be signed out. This session stays active and you won't be asked to
+				change the password again.
 			{:else}
-				The user will be required to change this password on next sign-in, and all of their
-				existing sessions will be revoked.
+				The user will be required to change this password on next sign-in, and all of their existing
+				sessions will be revoked.
 			{/if}
 		</Banner>
 

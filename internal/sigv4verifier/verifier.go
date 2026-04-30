@@ -387,11 +387,6 @@ func stringToSign(reqTime time.Time, region, service, canonical string) string {
 	return Algorithm + "\n" + reqTime.UTC().Format("20060102T150405Z") + "\n" + scope + "\n" + hash
 }
 
-func sign(secret, date, region, service, stringToSign string) string {
-	k := deriveSigningKey(secret, date, region, service)
-	return hex.EncodeToString(hmacSHA256(k, []byte(stringToSign)))
-}
-
 func deriveSigningKey(secret, date, region, service string) []byte {
 	kDate := hmacSHA256([]byte("AWS4"+secret), []byte(date))
 	kRegion := hmacSHA256(kDate, []byte(region))
