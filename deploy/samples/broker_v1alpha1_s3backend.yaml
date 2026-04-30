@@ -6,7 +6,6 @@ spec:
   endpoint: https://nas.internal.example:8010
   region: us-east-1
   addressingStyle: path
-  quobjectsStorageSpace: k8s-buckets
   adminCredentialsSecretRef:
     name: backend-admin-credentials
     namespace: stowage-system

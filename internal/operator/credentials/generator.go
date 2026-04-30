@@ -13,7 +13,7 @@ import (
 
 // VirtualKey is a tenant-facing access/secret pair. AccessKeyID is formatted
 // to satisfy AWS SDK validators ("AKIA" + 16 base32 chars, upper-case, no
-// padding). No QuObjects prefix is ever present.
+// padding).
 type VirtualKey struct {
 	AccessKeyID     string
 	SecretAccessKey string

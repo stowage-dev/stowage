@@ -431,7 +431,6 @@ func (r *BucketClaimReconciler) resolveAdmin(ctx context.Context, b *brokerv1a1.
 		Namespace:      b.Spec.AdminCredentialsSecretRef.Namespace,
 		AccessKeyField: b.Spec.AdminCredentialsSecretRef.AccessKeyField,
 		SecretKeyField: b.Spec.AdminCredentialsSecretRef.SecretKeyField,
-		StorageSpace:   b.Spec.QuObjectsStorageSpace,
 	})
 }
 

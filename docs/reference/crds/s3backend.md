@@ -17,7 +17,6 @@ spec:
   endpoint: string                       # required, ^https?://.+
   region: string                         # default: us-east-1
   addressingStyle: path|virtual          # default: path
-  quobjectsStorageSpace: string          # optional, ^[^\s]+$
   adminCredentialsSecretRef:
     name: string                         # required
     namespace: string                    # required
@@ -59,7 +58,6 @@ Encoded as `+kubebuilder:validation:*` tags on the type:
 - `addressingStyle` ∈ `{path, virtual}`.
 - `region` is unconstrained but rendered to defaults.
 - Admin Secret name / namespace must be non-empty.
-- `quobjectsStorageSpace` (if set) has no whitespace.
 - `bucketNameTemplate` is a Go text/template with vars `.Namespace`,
   `.Name`, `.Hash`.
 

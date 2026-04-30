@@ -19,7 +19,7 @@ import (
 type Config struct {
 	Endpoint        string
 	Region          string
-	AccessKeyID     string // already prefixed with "<storageSpace>:" when QuObjects applies
+	AccessKeyID     string
 	SecretAccessKey string
 	UsePathStyle    bool
 
