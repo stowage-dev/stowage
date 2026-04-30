@@ -1,14 +1,15 @@
 # Stowage chart — deploys the dashboard, embedded S3 SigV4 proxy, and the
 # operator wired together in one namespace. Override only what you need;
 # every other knob is rendered with a working default by the templates.
-
-namespace: stowage-system
+#
+# The chart deploys into the Helm release namespace. Pick it at install time
+# with `helm install stowage ./chart -n stowage-system --create-namespace`.
 
 image:
   registry: ghcr.io/stowage-dev
-  tag: sha-75f9ca6
+  tag: dev
   pullPolicy: IfNotPresent
-  # Names of existing dockerconfigjson Secrets in .Values.namespace to attach
+  # Names of existing dockerconfigjson Secrets in the release namespace to attach
   # as imagePullSecrets on every Pod. The chart does not create these.
   pullSecrets: []
 

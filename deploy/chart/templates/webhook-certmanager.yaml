@@ -6,7 +6,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: stowage-operator-selfsigned
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "stowage.operatorLabels" . | nindent 4 }}
 spec:
@@ -17,15 +17,15 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: stowage-operator-webhook-cert
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "stowage.operatorLabels" . | nindent 4 }}
 spec:
   secretName: stowage-operator-webhook-cert
   dnsNames:
-    - stowage-operator-webhook.{{ .Values.namespace }}
-    - stowage-operator-webhook.{{ .Values.namespace }}.svc
-    - stowage-operator-webhook.{{ .Values.namespace }}.svc.cluster.local
+    - stowage-operator-webhook.{{ .Release.Namespace }}
+    - stowage-operator-webhook.{{ .Release.Namespace }}.svc
+    - stowage-operator-webhook.{{ .Release.Namespace }}.svc.cluster.local
   issuerRef:
     kind: {{ .Values.webhook.certManager.issuerRef.kind }}
     name: {{ .Values.webhook.certManager.issuerRef.name | default "stowage-operator-selfsigned" }}

@@ -37,12 +37,12 @@ app.kubernetes.io/component: operator
   port (s3_proxy.listen :8090).
 */}}
 {{- define "stowage.proxyEndpointURL" -}}
-http://stowage.{{ .Values.namespace }}.svc.cluster.local:8090
+http://stowage.{{ .Release.Namespace }}.svc.cluster.local:8090
 {{- end -}}
 
 {{/*
   imagePullSecrets renders the Pod-spec field. Names existing Secrets in
-  .Values.namespace; the chart does not create dockerconfigjson Secrets.
+  .Release.Namespace; the chart does not create dockerconfigjson Secrets.
   Emits nothing when the list is empty.
 */}}
 {{- define "stowage.imagePullSecrets" -}}
@@ -67,7 +67,7 @@ imagePullSecrets:
 {{ .Values.secretKey }}
 {{- else -}}
 {{- if not (hasKey .Values "_secretKeyCache") -}}
-  {{- $existing := lookup "v1" "Secret" .Values.namespace "stowage-secret-key" -}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace "stowage-secret-key" -}}
   {{- $key := "" -}}
   {{- if and $existing (hasKey (default (dict) $existing.data) "STOWAGE_SECRET_KEY") -}}
     {{- $key = (index $existing.data "STOWAGE_SECRET_KEY" | b64dec) -}}
@@ -92,12 +92,12 @@ imagePullSecrets:
 {{- define "stowage.webhookCert" -}}
 {{- if not (hasKey .Values "_webhookCertCache") -}}
   {{- $cache := dict -}}
-  {{- $svc := printf "stowage-operator-webhook.%s.svc" .Values.namespace -}}
+  {{- $svc := printf "stowage-operator-webhook.%s.svc" .Release.Namespace -}}
   {{- $altNames := list
-      (printf "stowage-operator-webhook.%s" .Values.namespace)
+      (printf "stowage-operator-webhook.%s" .Release.Namespace)
       $svc
       (printf "%s.cluster.local" $svc) -}}
-  {{- $existing := lookup "v1" "Secret" .Values.namespace "stowage-operator-webhook-cert" -}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace "stowage-operator-webhook-cert" -}}
   {{- if and $existing (hasKey (default (dict) $existing.data) "tls.crt") (hasKey (default (dict) $existing.data) "ca.crt") -}}
     {{- $cache = dict
         "caCrt"  (index $existing.data "ca.crt")

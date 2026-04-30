@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stowage-operator
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "stowage.operatorLabels" . | nindent 4 }}
 spec:
@@ -34,7 +34,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --leader-elect=true
-            - --operator-namespace={{ .Values.namespace }}
+            - --operator-namespace={{ .Release.Namespace }}
             - --proxy-endpoint={{ include "stowage.proxyEndpointURL" . }}
             - --enable-webhooks={{ .Values.webhook.enabled }}
             - --webhook-cert-dir=/etc/stowage-operator/webhook/certs
