@@ -34,14 +34,13 @@ import (
 )
 
 type benchCase struct {
-	name    string
-	method  string
-	path    string
-	body    []byte
-	ctype   string
-	csrf    bool
-	expect  int
-	prepare func() error
+	name   string
+	method string
+	path   string
+	body   []byte
+	ctype  string
+	csrf   bool
+	expect int
 }
 
 type sample struct {
@@ -55,7 +54,6 @@ type result struct {
 	duration    time.Duration
 	ops         int64
 	errs        int64
-	bytes       int64
 	latencies   []time.Duration
 }
 
@@ -362,7 +360,6 @@ func runCase(c *http.Client, base, csrf string, bc benchCase, conc int, dur, war
 
 	var ops int64
 	var errs int64
-	var bytesRead int64
 	samplesCh := make(chan sample, conc*128)
 
 	var wg sync.WaitGroup
@@ -379,7 +376,6 @@ func runCase(c *http.Client, base, csrf string, bc benchCase, conc int, dur, war
 		if s.ok {
 			latencies = append(latencies, s.dur)
 		}
-		_ = bytesRead
 	}
 	wg.Wait()
 	elapsed := time.Since(start)

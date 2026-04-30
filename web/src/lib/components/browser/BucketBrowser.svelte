@@ -34,7 +34,12 @@
 	import { api, ApiException } from '$lib/api';
 	import { bytes } from '$lib/format';
 	import { tweaks, setTweak } from '$lib/stores/tweaks.svelte';
-	import { queue, resolveAllConflicts, uploadFiles } from '$lib/stores/uploads.svelte';
+	import {
+		queue,
+		resolveAllConflicts,
+		uploadFiles,
+		type UploadEntry
+	} from '$lib/stores/uploads.svelte';
 	import { inferKind } from '$lib/backend-kind';
 	import { toBrowserItems } from '$lib/browser-items';
 	import { session } from '$lib/stores/session.svelte';
@@ -109,6 +114,7 @@
 	let creatingFolder = $state(false);
 	let folderName = $state('');
 	let fileInput: HTMLInputElement | null = $state(null);
+	let folderInput: HTMLInputElement | null = $state(null);
 	let filter = $state('');
 	let moveDialog = $state<{ keys: string[]; defaultOperation: 'copy' | 'move' } | null>(null);
 	let refreshing = $state(false);
@@ -236,13 +242,73 @@
 	async function onDrop(e: DragEvent) {
 		e.preventDefault();
 		dragOver = false;
-		const files = e.dataTransfer?.files;
-		if (!files?.length || !canWrite) return;
-		await runUploads(Array.from(files));
+		if (!canWrite) return;
+		const dt = e.dataTransfer;
+		if (!dt) return;
+
+		// `webkitGetAsEntry` is the only way to recover folder structure from a
+		// drop — `dataTransfer.files` flattens directories to a single 0-byte
+		// entry that XHR can't read. Pull the entries synchronously while the
+		// drop event is still active, then walk them async.
+		const roots: FileSystemEntry[] = [];
+		if (dt.items && dt.items.length > 0) {
+			for (let i = 0; i < dt.items.length; i++) {
+				const it = dt.items[i];
+				if (it.kind !== 'file') continue;
+				const fe = it.webkitGetAsEntry?.();
+				if (fe) roots.push(fe);
+			}
+		}
+
+		const entries: UploadEntry[] = [];
+		if (roots.length > 0) {
+			for (const root of roots) {
+				await collectEntries(root, '', entries);
+			}
+		} else if (dt.files) {
+			for (const f of Array.from(dt.files)) {
+				entries.push({ file: f, relativePath: f.name });
+			}
+		}
+		if (!entries.length) return;
+		await runUploads(entries);
+	}
+
+	async function collectEntries(
+		entry: FileSystemEntry,
+		prefix: string,
+		out: UploadEntry[]
+	): Promise<void> {
+		if (entry.isFile) {
+			const fileEntry = entry as FileSystemFileEntry;
+			const file = await new Promise<File>((resolve, reject) =>
+				fileEntry.file(resolve, reject)
+			);
+			out.push({ file, relativePath: prefix + entry.name });
+			return;
+		}
+		if (!entry.isDirectory) return;
+		const dirEntry = entry as FileSystemDirectoryEntry;
+		const reader = dirEntry.createReader();
+		const subPrefix = prefix + entry.name + '/';
+		// readEntries returns at most ~100 children per call; loop until empty.
+		while (true) {
+			const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+				reader.readEntries(resolve, reject)
+			);
+			if (batch.length === 0) break;
+			for (const child of batch) {
+				await collectEntries(child, subPrefix, out);
+			}
+		}
 	}
 
 	function onPickFiles() {
 		fileInput?.click();
+	}
+
+	function onPickFolder() {
+		folderInput?.click();
 	}
 
 	async function onFileChange(e: Event) {
@@ -250,11 +316,21 @@
 		const files = input.files ? Array.from(input.files) : [];
 		input.value = '';
 		if (!files.length) return;
-		await runUploads(files);
+		await runUploads(files.map((f) => ({ file: f, relativePath: f.name })));
 	}
 
-	async function runUploads(files: File[]) {
-		await uploadFiles(api, backend.id, bucket, s3Prefix(), files);
+	async function onFolderChange(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const files = input.files ? Array.from(input.files) : [];
+		input.value = '';
+		if (!files.length) return;
+		await runUploads(
+			files.map((f) => ({ file: f, relativePath: f.webkitRelativePath || f.name }))
+		);
+	}
+
+	async function runUploads(entries: UploadEntry[]) {
+		await uploadFiles(api, backend.id, bucket, s3Prefix(), entries);
 		await invalidateAll();
 	}
 
@@ -432,6 +508,14 @@
 </script>
 
 <input bind:this={fileInput} type="file" multiple hidden onchange={onFileChange} />
+<input
+	bind:this={folderInput}
+	type="file"
+	multiple
+	hidden
+	onchange={onFolderChange}
+	{...{ webkitdirectory: true, directory: true }}
+/>
 
 <div
 	class="relative flex h-full min-h-0 flex-col"
@@ -551,6 +635,8 @@
 					New folder
 				</Button>
 				{#snippet uploadIcon()}<Upload size={12} strokeWidth={1.7} />{/snippet}
+				{#snippet folderUploadIcon()}<Folder size={12} strokeWidth={1.7} />{/snippet}
+				<Button size="sm" icon={folderUploadIcon} onclick={onPickFolder}>Upload folder</Button>
 				<Button size="sm" variant="primary" icon={uploadIcon} onclick={onPickFiles}>Upload</Button>
 			{/if}
 		{/if}

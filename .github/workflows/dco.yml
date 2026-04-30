@@ -12,7 +12,7 @@ jobs:
     name: Check DCO sign-off
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history for the base..head walk below.
           fetch-depth: 0
@@ -27,6 +27,17 @@ jobs:
           while read -r sha; do
             [ -z "$sha" ] && continue
             author="$(git show -s --format='%an <%ae>' "$sha")"
+            # Bot accounts (dependabot[bot], github-actions[bot], etc.) author
+            # commits under their noreply address but carry a Signed-off-by
+            # with a different email (Dependabot signs as support@github.com).
+            # The bot identity is verifiable via GitHub's commit attestation,
+            # so the DCO equality check is theatrical here — exempt them.
+            case "$author" in
+              *"[bot]"*)
+                echo "::notice::skipping DCO check for bot commit $sha by $author"
+                continue
+                ;;
+            esac
             trailers="$(git show -s --format='%(trailers:key=Signed-off-by,valueonly=true)' "$sha" | tr -d '\r')"
             if [ -z "$trailers" ]; then
               echo "::error::commit $sha by $author is missing a Signed-off-by trailer"

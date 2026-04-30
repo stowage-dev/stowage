@@ -70,6 +70,15 @@ function abortRuntime(id: string): void {
 	runtimes.delete(id);
 }
 
+// Drag-drop / folder-input flows produce files with a path relative to the
+// dropped root (e.g. `myfolder/sub/a.txt`); plain file pickers just have the
+// filename. The runner preserves that path under the destination prefix so
+// folders rematerialise on the server side.
+export interface UploadEntry {
+	file: File;
+	relativePath: string;
+}
+
 /**
  * Upload a batch of files to a bucket prefix. Each upload is added to the
  * visible queue. Files <= 5 MB use the simple multipart-form endpoint;
@@ -80,22 +89,28 @@ export async function uploadFiles(
 	backendId: string,
 	bucket: string,
 	prefix: string,
-	files: File[]
+	entries: UploadEntry[]
 ): Promise<void> {
 	const startIdx = queue.items.length;
-	for (const f of files) {
+	for (const e of entries) {
 		const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 		queue.items.push({
 			id,
-			name: f.name,
-			kind: kindOf(f),
+			name: e.relativePath,
+			kind: kindOf(e.file),
 			progress: 0,
 			status: 'uploading'
 		});
-		runtimes.set(id, { api, backendId, bucket, key: prefix + f.name, file: f });
+		runtimes.set(id, {
+			api,
+			backendId,
+			bucket,
+			key: prefix + e.relativePath,
+			file: e.file
+		});
 	}
 
-	for (let i = 0; i < files.length; i++) {
+	for (let i = 0; i < entries.length; i++) {
 		// Read the reactive proxy back out of the $state array so mutations
 		// to item.progress / item.status inside the runners trigger reactivity.
 		const item = queue.items[startIdx + i];

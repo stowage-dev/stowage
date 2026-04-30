@@ -14,6 +14,8 @@ export const load: PageLoad = async ({ fetch, parent }) => {
 		return { admin: { endpoints, error: null as string | null } };
 	} catch (err) {
 		const empty: Endpoint[] = [];
-		return { admin: { endpoints: empty, error: err instanceof Error ? err.message : 'list failed' } };
+		return {
+			admin: { endpoints: empty, error: err instanceof Error ? err.message : 'list failed' }
+		};
 	}
 };
