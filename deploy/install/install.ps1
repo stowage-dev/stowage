@@ -1,7 +1,9 @@
 # stowage downloader for Windows PowerShell.
 #
-# Downloads stowage.exe into the current directory, verifies its SHA256
-# checksum, and runs it. Nothing is added to PATH or any system location.
+# If Docker is installed and the daemon is reachable, runs the published
+# OCI image. Otherwise downloads stowage.exe into the current directory,
+# verifies its SHA256 checksum, and runs it. Nothing is added to PATH or
+# any system location.
 #
 #   irm https://stowage.dev/install.ps1 | iex
 #   & ([scriptblock]::Create((irm https://stowage.dev/install.ps1))) serve --config my.yaml
@@ -11,11 +13,13 @@
 #   $env:STOWAGE_REPO          GitHub owner/name (default: stowage-dev/stowage)
 #   $env:STOWAGE_RELEASE_BASE  Full base URL for binary downloads. Overrides REPO/VERSION.
 #   $env:STOWAGE_NO_RUN        If '1', download and verify but do not run.
+#   $env:STOWAGE_NO_DOCKER     If '1', skip Docker detection and use the binary.
+#   $env:STOWAGE_DOCKER_IMAGE  Override the OCI image reference (default: ghcr.io/<repo>:<version>).
 
 [CmdletBinding()]
 param(
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]] $Args
+  [string[]] $Arguments
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +43,32 @@ if ($env:STOWAGE_RELEASE_BASE) {
   $base = "https://github.com/$repo/releases/latest/download"
 } else {
   $base = "https://github.com/$repo/releases/download/$version"
+}
+
+# Prefer the published OCI image if Docker is installed and the daemon is
+# reachable. `docker info` confirms reachability — being on PATH isn't enough
+# (Docker Desktop on Windows can be installed but stopped).
+function Test-DockerAvailable {
+  if ($env:STOWAGE_NO_DOCKER -eq '1') { return $false }
+  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
+  & docker info *>$null
+  return ($LASTEXITCODE -eq 0)
+}
+
+if (Test-DockerAvailable) {
+  if ($env:STOWAGE_DOCKER_IMAGE) {
+    $image = $env:STOWAGE_DOCKER_IMAGE
+  } else {
+    $tag = if ($version -eq 'latest') { 'latest' } else { $version }
+    $image = "ghcr.io/${repo}:${tag}"
+  }
+  Info "docker detected; running $image"
+  Info "running: docker run --rm -i -p 8080:8080 -p 9000:9000 -p 9001:9001 -v stowage-data:/data $image $($Arguments -join ' ')"
+  & docker run --rm -i `
+    -p 8080:8080 -p 9000:9000 -p 9001:9001 `
+    -v stowage-data:/data `
+    $image @Arguments
+  exit $LASTEXITCODE
 }
 
 # Architecture detection. We only ship windows-amd64 today; surface a clear
@@ -101,6 +131,6 @@ if ($env:STOWAGE_NO_RUN -eq '1') {
   exit 0
 }
 
-Info "running: $target $($Args -join ' ')"
-& $target @Args
+Info "running: $target $($Arguments -join ' ')"
+& $target @Arguments
 exit $LASTEXITCODE

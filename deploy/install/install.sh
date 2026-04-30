@@ -1,9 +1,10 @@
 #!/bin/sh
 # stowage downloader for macOS, Linux, and WSL.
 #
-# Downloads the platform-appropriate stowage binary into the current
-# directory, verifies its SHA256 checksum, and runs it. Nothing is added
-# to PATH or any system location.
+# If Docker is installed and the daemon is reachable, runs the published
+# OCI image. Otherwise downloads the platform-appropriate stowage binary
+# into the current directory, verifies its SHA256 checksum, and runs it.
+# Nothing is added to PATH or any system location.
 #
 #   curl -fsSL https://stowage.dev/install.sh | sh
 #   curl -fsSL https://stowage.dev/install.sh | sh -s -- serve --config my.yaml
@@ -13,6 +14,8 @@
 #   STOWAGE_REPO          GitHub owner/name (default: stowage-dev/stowage)
 #   STOWAGE_RELEASE_BASE  Full base URL for binary downloads. Overrides REPO/VERSION.
 #   STOWAGE_NO_RUN        If set to 1, download and verify but do not exec.
+#   STOWAGE_NO_DOCKER     If set to 1, skip Docker detection and use the binary.
+#   STOWAGE_DOCKER_IMAGE  Override the OCI image reference (default: ghcr.io/<repo>:<version>).
 set -eu
 
 REPO="${STOWAGE_REPO:-stowage-dev/stowage}"
@@ -28,6 +31,26 @@ fi
 
 err() { printf 'stowage-install: %s\n' "$*" >&2; exit 1; }
 log() { printf '==> %s\n' "$*"; }
+
+# Prefer the published OCI image if Docker is installed and the daemon is
+# reachable. `docker info` confirms reachability — being on PATH isn't enough.
+if [ "${STOWAGE_NO_DOCKER:-0}" != "1" ] \
+   && command -v docker >/dev/null 2>&1 \
+   && docker info >/dev/null 2>&1; then
+  if [ -n "${STOWAGE_DOCKER_IMAGE:-}" ]; then
+    image="${STOWAGE_DOCKER_IMAGE}"
+  elif [ "${VERSION}" = "latest" ]; then
+    image="ghcr.io/${REPO}:latest"
+  else
+    image="ghcr.io/${REPO}:${VERSION}"
+  fi
+  log "docker detected; running ${image}"
+  log "running: docker run --rm -i -p 8080:8080 -p 9000:9000 -p 9001:9001 -v stowage-data:/data ${image} $*"
+  exec docker run --rm -i \
+    -p 8080:8080 -p 9000:9000 -p 9001:9001 \
+    -v stowage-data:/data \
+    "${image}" "$@"
+fi
 
 uname_s="$(uname -s 2>/dev/null || echo unknown)"
 uname_m="$(uname -m 2>/dev/null || echo unknown)"
