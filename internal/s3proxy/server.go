@@ -164,7 +164,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Metrics.Requests.WithLabelValues(r.Method, out.operation, strconv.Itoa(out.status), out.result, out.authMode).Inc()
 	s.cfg.Metrics.Duration.WithLabelValues(out.operation).Observe(elapsed)
 
-	s.cfg.Log.Info("request",
+	// Successful responses log at higher verbosity so routine traffic
+	// doesn't drown out the default stream. Set log.level: debug to see them.
+	log := s.cfg.Log
+	if out.status < 400 {
+		log = log.V(1)
+	}
+	log.Info("request",
 		"method", r.Method,
 		"host", r.Host,
 		"path", RedactPath(r.URL),
