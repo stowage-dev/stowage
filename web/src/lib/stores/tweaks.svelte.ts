@@ -4,13 +4,11 @@
 import { browser } from '$app/environment';
 
 export type Density = 'compact' | 'cosy' | 'roomy';
-export type ViewMode = 'table' | 'grid';
 export type SidebarStyle = 'nested' | 'flat';
 export type TopbarStyle = 'breadcrumb' | 'search';
 
 export interface Tweaks {
 	density: Density;
-	viewMode: ViewMode;
 	sidebarStyle: SidebarStyle;
 	topbarStyle: TopbarStyle;
 	showUploadQueue: boolean;
@@ -18,7 +16,6 @@ export interface Tweaks {
 
 const DEFAULTS: Tweaks = {
 	density: 'cosy',
-	viewMode: 'table',
 	sidebarStyle: 'nested',
 	topbarStyle: 'search',
 	showUploadQueue: true

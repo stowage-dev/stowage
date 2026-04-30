@@ -435,14 +435,7 @@
 		{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
 		{#snippet renameIcon()}<Pencil size={13} strokeWidth={1.7} />{/snippet}
 		{#snippet moveIcon()}<FolderInput size={13} strokeWidth={1.7} />{/snippet}
-		<Button
-			variant="primary"
-			icon={shareIcon}
-			onclick={() => onshare(item)}
-			title="Sharing arrives in Phase 5"
-		>
-			Share
-		</Button>
+		<Button variant="primary" icon={shareIcon} onclick={() => onshare(item)}>Share</Button>
 		<Button icon={downloadIcon} onclick={() => ondownload?.(item)}>Download</Button>
 		<span class="flex-1"></span>
 		{#if onmove}

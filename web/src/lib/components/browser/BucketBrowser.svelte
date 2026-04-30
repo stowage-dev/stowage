@@ -8,11 +8,8 @@
 		Info,
 		Plus,
 		Upload,
-		Share2,
 		Download,
 		Trash2,
-		List,
-		LayoutGrid,
 		Search,
 		FolderInput,
 		RotateCw,
@@ -281,9 +278,7 @@
 	): Promise<void> {
 		if (entry.isFile) {
 			const fileEntry = entry as FileSystemFileEntry;
-			const file = await new Promise<File>((resolve, reject) =>
-				fileEntry.file(resolve, reject)
-			);
+			const file = await new Promise<File>((resolve, reject) => fileEntry.file(resolve, reject));
 			out.push({ file, relativePath: prefix + entry.name });
 			return;
 		}
@@ -324,9 +319,7 @@
 		const files = input.files ? Array.from(input.files) : [];
 		input.value = '';
 		if (!files.length) return;
-		await runUploads(
-			files.map((f) => ({ file: f, relativePath: f.webkitRelativePath || f.name }))
-		);
+		await runUploads(files.map((f) => ({ file: f, relativePath: f.webkitRelativePath || f.name })));
 	}
 
 	async function runUploads(entries: UploadEntry[]) {
@@ -563,13 +556,9 @@
 		{#if selected.length > 0}
 			<div class="flex items-center gap-2 text-[12.5px] text-[var(--stw-fg)]">
 				<span class="font-medium">{selected.length} selected</span>
-				{#snippet shareIcon()}<Share2 size={12} strokeWidth={1.7} />{/snippet}
 				{#snippet downloadIcon()}<Download size={12} strokeWidth={1.7} />{/snippet}
 				{#snippet trashIcon()}<Trash2 size={12} strokeWidth={1.7} />{/snippet}
 				{#snippet moveIcon()}<FolderInput size={12} strokeWidth={1.7} />{/snippet}
-				<Button size="sm" icon={shareIcon} disabled title="Sharing arrives in Phase 5">
-					Share
-				</Button>
 				<Button size="sm" icon={downloadIcon} onclick={downloadSelected}>
 					{selected.length > 1 || selected.some((k) => k.endsWith('/'))
 						? 'Download .zip'
@@ -601,17 +590,6 @@
 				onkeydown={(e) => {
 					if (e.key === 'Escape') filter = '';
 				}}
-			/>
-			{#snippet listIcon()}<List size={12} strokeWidth={1.7} />{/snippet}
-			{#snippet gridIcon()}<LayoutGrid size={12} strokeWidth={1.7} />{/snippet}
-			<Segmented
-				value={tweaks.viewMode}
-				onchange={(v) => setTweak('viewMode', v)}
-				size="sm"
-				options={[
-					{ value: 'table', icon: listIcon, label: '' },
-					{ value: 'grid', icon: gridIcon, label: '' }
-				]}
 			/>
 			<Segmented
 				value={tweaks.density}
@@ -723,7 +701,6 @@
 			<ObjectTable
 				{items}
 				density={tweaks.density}
-				view={tweaks.viewMode}
 				{selected}
 				{folderSizes}
 				setSelected={(s) => (selected = s)}
