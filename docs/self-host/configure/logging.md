@@ -29,14 +29,18 @@ uses `text` because it's friendlier when kicking the tyres.
 
 | Level | What's emitted |
 |---|---|
-| `debug` | Per-request handler decisions, retry decisions, source-of-truth merges. Verbose. |
+| `debug` | Handler decisions, retry decisions, source-of-truth merges. Verbose. |
 | `info` | Default. Startup banner, config summary, audit-recorder lifecycle, scheduled scans. |
 | `warn` | Recoverable problems: backend probe failure, audit-queue overflow, secret-key auto-regenerated on first boot. |
 | `error` | Unrecoverable per-request errors. The handler still returns a response; this just records why. |
 
+Successful (2xx / 3xx) HTTP requests are intentionally not logged — they
+are captured in metrics (and, for the S3 proxy, sampled into the audit
+log). Only error responses (status ≥ 400) emit a per-request line.
+
 ## Useful structured fields
 
-Every request log line includes:
+Every error-request log line includes:
 
 - `req_id` — chi's RequestID middleware (UUID).
 - `remote_addr` — after `server.trusted_proxies` resolution.

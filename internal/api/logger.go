@@ -17,13 +17,13 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			next.ServeHTTP(ww, r)
-			// Successful responses log at Debug so routine traffic doesn't
-			// drown out the Info stream. Set log.level: debug to see them.
-			level := slog.LevelDebug
-			if ww.Status() >= 400 {
-				level = slog.LevelInfo
+			// Successful responses are intentionally not logged — routine
+			// 2xx/3xx traffic is captured in metrics; only errors get a
+			// per-request line.
+			if ww.Status() < 400 {
+				return
 			}
-			logger.Log(r.Context(), level, "http",
+			logger.Log(r.Context(), slog.LevelInfo, "http",
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", ww.Status(),

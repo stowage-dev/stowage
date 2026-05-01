@@ -164,23 +164,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Metrics.Requests.WithLabelValues(r.Method, out.operation, strconv.Itoa(out.status), out.result, out.authMode).Inc()
 	s.cfg.Metrics.Duration.WithLabelValues(out.operation).Observe(elapsed)
 
-	// Successful responses log at higher verbosity so routine traffic
-	// doesn't drown out the default stream. Set log.level: debug to see them.
-	log := s.cfg.Log
-	if out.status < 400 {
-		log = log.V(1)
+	// Successful responses are intentionally not logged — routine 2xx/3xx
+	// traffic is captured in metrics and (sampled) audit; only errors get
+	// a per-request line.
+	if out.status >= 400 {
+		s.cfg.Log.Info("request",
+			"method", r.Method,
+			"host", r.Host,
+			"path", RedactPath(r.URL),
+			"status", out.status,
+			"operation", out.operation,
+			"result", out.result,
+			"auth_mode", out.authMode,
+			"latency_ms", time.Since(start).Milliseconds(),
+			"request_id", reqID,
+		)
 	}
-	log.Info("request",
-		"method", r.Method,
-		"host", r.Host,
-		"path", RedactPath(r.URL),
-		"status", out.status,
-		"operation", out.operation,
-		"result", out.result,
-		"auth_mode", out.authMode,
-		"latency_ms", time.Since(start).Milliseconds(),
-		"request_id", reqID,
-	)
 
 	if s.cfg.Audit != nil && s.shouldRecordAudit(r, out) {
 		s.recordAudit(r, reqID, out)
