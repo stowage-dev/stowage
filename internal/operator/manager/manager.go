@@ -83,9 +83,17 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	sch := clientgoscheme.Scheme
 	utilruntime.Must(brokerv1a1.AddToScheme(sch))
 
+	// controller-runtime treats an empty BindAddress as "use the default
+	// :8080", which collides with the main stowage HTTP listener in the
+	// integrated single-binary deployment. "0" is the documented way to
+	// disable the listener entirely.
+	metricsAddr := cfg.MetricsAddr
+	if metricsAddr == "" {
+		metricsAddr = "0"
+	}
 	mgrOpts := ctrl.Options{
 		Scheme:  sch,
-		Metrics: metricsserver.Options{BindAddress: cfg.MetricsAddr},
+		Metrics: metricsserver.Options{BindAddress: metricsAddr},
 	}
 	if cfg.Webhook.Enabled {
 		mgrOpts.WebhookServer = webhookserver.NewServer(webhookserver.Options{
