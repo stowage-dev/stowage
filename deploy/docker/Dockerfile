@@ -47,7 +47,7 @@ RUN CGO_ENABLED=0 go build \
 # (so the in-binary quickstart can fetch MinIO over TLS). Everything else
 # the quickstart needs — download, sha256 verify, subprocess management —
 # is handled inside the stowage binary.
-FROM alpine:3.20
+FROM alpine:3.23
 # Explicit numeric UID/GID so Kubernetes' runAsNonRoot admission can
 # verify the image runs as non-root without resolving /etc/passwd.
 RUN apk add --no-cache ca-certificates tini \
