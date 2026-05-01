@@ -28,8 +28,10 @@ kubectl -n stowage-system create secret docker-registry my-registry-creds \
   --docker-password=$REGISTRY_TOKEN
 ```
 
-The chart attaches `imagePullSecrets:` to the Stowage and operator
-Deployments using whatever names you list.
+The chart attaches `imagePullSecrets:` to the Stowage Deployment using
+whatever names you list. (There is no separate operator Pod — the
+operator manager runs inside the stowage container when
+`operator.enabled` is true.)
 
 ## Multiple secrets
 
@@ -46,5 +48,4 @@ Kubernetes tries each in order until one works.
 
 ```sh
 kubectl -n stowage-system get deploy stowage -o jsonpath='{.spec.template.spec.imagePullSecrets}'
-kubectl -n stowage-system get deploy stowage-operator -o jsonpath='{.spec.template.spec.imagePullSecrets}'
 ```

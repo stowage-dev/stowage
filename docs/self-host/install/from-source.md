@@ -52,12 +52,9 @@ make build
 # → bin/stowage
 ```
 
-For the operator binary as well:
-
-```sh
-make build-all
-# → bin/stowage and bin/stowage-operator
-```
+The same binary serves both the dashboard (`stowage serve`) and the
+Kubernetes operator manager (`stowage operator`); pick the
+subcommand at runtime.
 
 ## Test and lint
 
