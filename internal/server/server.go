@@ -436,15 +436,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	if s.s3http != nil {
 		// Start K8s informer first so the cache is primed before we accept
-		// proxy traffic. A short timeout keeps boots from hanging
-		// indefinitely if the apiserver is unreachable.
+		// proxy traffic. The informer's lifecycle is tied to ctx so it keeps
+		// receiving Secret events for the life of the server; the initial
+		// sync deadline lives inside Start.
 		if s.s3kube != nil {
-			startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			if err := s.s3kube.Start(startCtx); err != nil {
-				cancel()
+			if err := s.s3kube.Start(ctx); err != nil {
 				s.logger.Warn("s3 proxy: kubernetes source start failed; continuing with sqlite-only", "err", err.Error())
-			} else {
-				cancel()
 			}
 		}
 		go s.s3sqlite.Run(ctx, s.s3reloadIv)

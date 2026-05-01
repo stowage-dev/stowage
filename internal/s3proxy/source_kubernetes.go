@@ -128,7 +128,9 @@ func NewKubernetesSource(cfg KubernetesSourceConfig, logger *slog.Logger) (*Kube
 // Start subscribes to Secret events in the configured namespace, filtered
 // to the operator role labels, and primes the in-memory cache.
 // Returns once the informer's first sync is complete; the goroutine that
-// services watch events runs until ctx is cancelled.
+// services watch events runs until ctx is cancelled. ctx must outlive the
+// source — cancelling it shuts the informer down. The initial sync wait is
+// bounded internally so a slow apiserver doesn't hang boot indefinitely.
 func (s *KubernetesSource) Start(ctx context.Context) error {
 	resync := s.cfg.ResyncPeriod
 	if resync <= 0 {
@@ -155,7 +157,9 @@ func (s *KubernetesSource) Start(ctx context.Context) error {
 	}
 
 	factory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+	syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if !cache.WaitForCacheSync(syncCtx.Done(), informer.HasSynced) {
 		return fmt.Errorf("kubernetes informer cache failed to sync within deadline")
 	}
 
