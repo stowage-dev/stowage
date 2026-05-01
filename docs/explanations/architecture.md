@@ -4,10 +4,12 @@ type: explanation
 
 # Architecture overview
 
-Stowage is one Go binary plus an optional second binary
-(`stowage-operator`). Both compile from the same module and share
-internal packages. The dashboard binary speaks HTTP on two listeners;
-the operator binary watches Kubernetes CRDs.
+Stowage is one Go binary. It serves the dashboard and embedded S3
+proxy via `stowage serve`, and — when `operator.enabled` is set in
+config — also runs the Kubernetes operator manager (S3Backend /
+BucketClaim reconcilers + admission webhook) inside the same Pod.
+A `stowage operator` subcommand exists for headless deployments
+that want only the K8s control-plane work without the dashboard.
 
 ## The single load-bearing seam
 
@@ -41,76 +43,66 @@ via the `Backend` interface itself, so dashboard probes and proxy
 forwards can have different lifetimes and different connection
 pools.
 
-## The dashboard process
+## The stowage process
 
 ```
-                   ┌─────────────────────────────────────────┐
-                   │ stowage  (cmd/stowage)                  │
-                   ├─────────────────────────────────────────┤
-                   │  HTTP listener  :8080                   │
-                   │   ├─ chi router (internal/api)          │
-                   │   ├─ embedded SvelteKit (web/dist)      │
-                   │   ├─ /metrics (Prometheus)              │
-                   │   ├─ /healthz, /readyz                  │
-                   │   └─ /s/<code>/* (public shares)        │
-                   │                                         │
-                   │  HTTP listener  :8090   (optional)      │
-                   │   └─ S3 SigV4 proxy (internal/s3proxy)  │
-                   │                                         │
-                   │  SQLite  (internal/store/sqlite)        │
-                   │   ├─ users, sessions, audit, shares,    │
-                   │   │   pinned buckets                    │
-                   │   ├─ sealed endpoint secrets            │
-                   │   ├─ virtual credentials                │
-                   │   └─ anonymous bindings                 │
-                   │                                         │
-                   │  Backend registry  (internal/backend)   │
-                   │   ├─ s3v4 driver                        │
-                   │   ├─ memory driver (tests)              │
-                   │   └─ probe scheduler                    │
-                   └─────────────────────────────────────────┘
+              ┌─────────────────────────────────────────────┐
+              │ stowage  (cmd/stowage)                      │
+              ├─────────────────────────────────────────────┤
+              │  HTTP listener  :8080                       │
+              │   ├─ chi router (internal/api)              │
+              │   ├─ embedded SvelteKit (web/dist)          │
+              │   ├─ /metrics (Prometheus)                  │
+              │   ├─ /healthz, /readyz                      │
+              │   └─ /s/<code>/* (public shares)            │
+              │                                             │
+              │  HTTP listener  :8090   (optional)          │
+              │   └─ S3 SigV4 proxy (internal/s3proxy)      │
+              │                                             │
+              │  HTTPS listener :9443   (when operator on)  │
+              │   └─ admission webhook                      │
+              │                                             │
+              │  Operator manager (when operator on)        │
+              │   ├─ S3Backend reconciler   (status)        │
+              │   ├─ S3Backend reconciler   (registry sync) │
+              │   ├─ BucketClaim reconciler                 │
+              │   ├─ vcstore writer (Secrets)               │
+              │   └─ admin client (bucket lifecycle)        │
+              │                                             │
+              │  SQLite  (internal/store/sqlite)            │
+              │   ├─ users, sessions, audit, shares,        │
+              │   │   pinned buckets                        │
+              │   ├─ sealed endpoint secrets                │
+              │   ├─ virtual credentials                    │
+              │   └─ anonymous bindings                     │
+              │                                             │
+              │  Backend registry  (internal/backend)       │
+              │   ├─ s3v4 driver                            │
+              │   ├─ memory driver (tests)                  │
+              │   ├─ probe scheduler                        │
+              │   └─ sources: config | db | k8s             │
+              └─────────────────────────────────────────────┘
 ```
 
-## The operator process
+## How K8s state reaches the dashboard
 
-```
-                   ┌──────────────────────────────────────────┐
-                   │ stowage-operator  (cmd/operator)         │
-                   ├──────────────────────────────────────────┤
-                   │  controller-runtime manager              │
-                   │   ├─ S3Backend reconciler                │
-                   │   ├─ BucketClaim reconciler              │
-                   │   ├─ admission webhook                   │
-                   │   └─ leader election (off by default —   │
-                   │       single replica)                    │
-                   │                                          │
-                   │  internal/operator/credentials/          │
-                   │   reads admin Secret, mints VC pairs     │
-                   │                                          │
-                   │  internal/operator/vcstore/              │
-                   │   writes:                                │
-                   │   - internal Secret (operator namespace) │
-                   │   - consumer Secret (claim namespace)    │
-                   │                                          │
-                   │  internal/operator/backend/              │
-                   │   talks S3 admin API to the upstream:    │
-                   │   create / empty / delete bucket         │
-                   └──────────────────────────────────────────┘
-```
+Three integration points share the same in-cluster client:
 
-## Wire contract between dashboard and operator
+1. **Backend registry** — when `operator.enabled`, the registry
+   reconciler watches `S3Backend` CRs and registers them as
+   read-only entries (`Source: k8s`). They appear in the admin UI
+   alongside config.yaml and DB-managed entries; PATCH/DELETE
+   refuse with `k8s_managed`.
+2. **Virtual-credential cache** — the embedded S3 proxy's
+   `KubernetesSource` informer watches operator-written tenant
+   Secrets so the proxy can verify SigV4 signatures and resolve
+   bucket scopes without a SQLite hit.
+3. **Quota cache** — the same informer feeds quota updates from
+   `BucketClaim.spec.quota` into the merged limit cache, shadowing
+   dashboard-managed quotas for the same bucket.
 
-The two binaries don't talk to each other directly. They communicate
-through Kubernetes Secrets:
-
-- The operator writes `internal Secret`s in its namespace.
-- The dashboard's S3 proxy runs an in-cluster informer over those
-  Secrets when `s3_proxy.kubernetes.enabled: true`.
-- The data and label fields are documented in
-  [Reference → Secret data fields](../reference/secret-fields.md).
-
-This keeps the operator independent of the dashboard's HTTP API and
-lets either side run without the other.
+The wire contract Secret data/label fields are documented in
+[Reference → Secret data fields](../reference/secret-fields.md).
 
 ## Lifecycle of a tenant request
 

@@ -16,13 +16,12 @@ Mechanics for working on the Stowage codebase.
 
 ```sh
 make build           # → bin/stowage
-make build-operator  # → bin/stowage-operator
-make build-all       # both
 ```
 
-The Go module path is `stowage` (no domain prefix). The operator
-imports the same internal packages as the dashboard, so they always
-build from the same source tree.
+The Go module path is `stowage` (no domain prefix). One binary serves
+both the dashboard / S3 proxy (`stowage serve`) and the K8s operator
+manager (`stowage operator`); the operator subcommand exists for
+headless deployments and is opt-in via `operator.enabled` in config.
 
 ## Test
 
@@ -116,15 +115,14 @@ mkdir -p web/dist
 [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
 ```
 
-## Docker images
+## Docker image
 
 ```sh
 make docker          # multi-stage stowage image
-make docker-operator # operator image
 ```
 
-Both use `deploy/docker/Dockerfile` and
-`deploy/operator/Dockerfile` respectively.
+Uses `deploy/docker/Dockerfile`. The same image runs `stowage serve`
+or `stowage operator`; pick the entrypoint via the Pod's `args`.
 
 ## SPDX header
 

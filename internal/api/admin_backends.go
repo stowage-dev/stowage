@@ -100,6 +100,11 @@ func fromRegistryEntry(e backend.Entry, row *sqlite.Backend) adminBackendDTO {
 		dto.SecretSet = len(row.SecretKeyEnc) > 0
 		dto.CreatedAt = row.CreatedAt.UTC().Format(time.RFC3339)
 		dto.UpdatedAt = row.UpdatedAt.UTC().Format(time.RFC3339)
+	} else if e.Source == backend.SourceK8s {
+		// K8s-managed entries have no DB row; the s3v4 driver carries the
+		// only metadata we have in-process. Surface enough for the UI to
+		// render a row + source label; full spec lives in the S3Backend CR.
+		dto.Type = "s3v4"
 	}
 	return dto
 }
@@ -208,10 +213,16 @@ func (d *BackendDeps) handleAdminCreateBackend(w http.ResponseWriter, r *http.Re
 		req.Type = "s3v4"
 	}
 
-	// Refuse if a YAML-managed entry with that id is already serving.
-	if src, ok := d.Registry.Source(req.ID); ok && src == backend.SourceConfig {
-		writeError(w, http.StatusConflict, "yaml_managed",
-			"an endpoint with this id is defined in config.yaml; choose a different id", "")
+	// Refuse if an externally-owned entry with that id is already serving.
+	if src, ok := d.Registry.Source(req.ID); ok && src.IsReadOnly() {
+		switch src {
+		case backend.SourceConfig:
+			writeError(w, http.StatusConflict, "yaml_managed",
+				"an endpoint with this id is defined in config.yaml; choose a different id", "")
+		case backend.SourceK8s:
+			writeError(w, http.StatusConflict, "k8s_managed",
+				"an endpoint with this id is defined by an S3Backend CR; choose a different id", "")
+		}
 		return
 	}
 
@@ -305,10 +316,16 @@ func (d *BackendDeps) handleAdminPatchBackend(w http.ResponseWriter, r *http.Req
 	}
 	id := chi.URLParam(r, "bid")
 
-	// YAML-managed entries are immutable through the UI by policy.
-	if src, ok := d.Registry.Source(id); ok && src == backend.SourceConfig {
-		writeError(w, http.StatusConflict, "yaml_managed",
-			"this endpoint is defined in config.yaml; edit the file and restart", "")
+	// Externally-owned entries are immutable through the UI by policy.
+	if src, ok := d.Registry.Source(id); ok && src.IsReadOnly() {
+		switch src {
+		case backend.SourceConfig:
+			writeError(w, http.StatusConflict, "yaml_managed",
+				"this endpoint is defined in config.yaml; edit the file and restart", "")
+		case backend.SourceK8s:
+			writeError(w, http.StatusConflict, "k8s_managed",
+				"this endpoint is defined by an S3Backend CR; edit the CR with kubectl", "")
+		}
 		return
 	}
 
@@ -467,9 +484,15 @@ func (d *BackendDeps) handleAdminDeleteBackend(w http.ResponseWriter, r *http.Re
 		return
 	}
 	id := chi.URLParam(r, "bid")
-	if src, ok := d.Registry.Source(id); ok && src == backend.SourceConfig {
-		writeError(w, http.StatusConflict, "yaml_managed",
-			"this endpoint is defined in config.yaml; remove it from the file instead", "")
+	if src, ok := d.Registry.Source(id); ok && src.IsReadOnly() {
+		switch src {
+		case backend.SourceConfig:
+			writeError(w, http.StatusConflict, "yaml_managed",
+				"this endpoint is defined in config.yaml; remove it from the file instead", "")
+		case backend.SourceK8s:
+			writeError(w, http.StatusConflict, "k8s_managed",
+				"this endpoint is defined by an S3Backend CR; delete the CR with kubectl", "")
+		}
 		return
 	}
 

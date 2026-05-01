@@ -425,6 +425,7 @@ func (s *Server) Run(ctx context.Context) error {
 				MetricsAddr:  s.cfg.Operator.MetricsAddr,
 				OpsNamespace: s.cfg.Operator.OpsNamespace,
 				ProxyURL:     s.cfg.Operator.ProxyURL,
+				Registry:     s.registry,
 				Webhook: opmgr.WebhookConfig{
 					Enabled: s.cfg.Operator.Webhook.Enabled,
 					Port:    s.cfg.Operator.Webhook.Port,

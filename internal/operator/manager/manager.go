@@ -21,6 +21,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/stowage-dev/stowage/internal/backend"
 	brokerv1a1 "github.com/stowage-dev/stowage/internal/operator/api/v1alpha1"
 	"github.com/stowage-dev/stowage/internal/operator/controller"
 	"github.com/stowage-dev/stowage/internal/operator/credentials"
@@ -49,6 +50,12 @@ type Config struct {
 	// ProxyURL is the in-cluster URL the operator writes into consumer
 	// Secrets so workloads know where to send S3 traffic.
 	ProxyURL string
+
+	// Registry, when non-nil, opts in to mirroring S3Backend CRs into the
+	// in-process backend registry as read-only entries. Headless deployments
+	// (the `stowage operator` subcommand) leave it nil — there is no admin
+	// UI in that process to surface the entries into.
+	Registry *backend.Registry
 
 	Webhook WebhookConfig
 }
@@ -94,7 +101,7 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 
 	resolver := &credentials.Resolver{Client: mgr.GetClient()}
 	writer := &vcstore.Writer{Client: mgr.GetClient(), Namespace: cfg.OpsNamespace}
-	recorder := mgr.GetEventRecorderFor("stowage-operator")
+	recorder := mgr.GetEventRecorderFor("stowage")
 
 	if err := (&controller.S3BackendReconciler{
 		Client:   mgr.GetClient(),
@@ -113,6 +120,17 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 		OpsNS:    cfg.OpsNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("setup BucketClaim controller: %w", err)
+	}
+
+	if cfg.Registry != nil {
+		if err := (&controller.RegistryReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Resolver: resolver,
+			Registry: cfg.Registry,
+		}).SetupWithManager(mgr); err != nil {
+			return fmt.Errorf("setup S3Backend registry controller: %w", err)
+		}
 	}
 
 	if cfg.Webhook.Enabled {
