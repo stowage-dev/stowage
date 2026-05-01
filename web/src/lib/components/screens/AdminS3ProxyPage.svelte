@@ -3,7 +3,16 @@
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { Plus, Trash2, RotateCw, KeyRound, Globe, Cloud, ServerCog, PowerOff } from 'lucide-svelte';
+	import {
+		Plus,
+		Trash2,
+		RotateCw,
+		KeyRound,
+		Globe,
+		Cloud,
+		ServerCog,
+		PowerOff
+	} from 'lucide-svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
@@ -195,10 +204,9 @@
 		{#snippet powerIcon()}<PowerOff size={22} strokeWidth={1.7} />{/snippet}
 		<EmptyState variant="card" icon={powerIcon} title="The S3 proxy is disabled.">
 			<div class="max-w-[640px] text-center">
-				The embedded SigV4 proxy is the master switch for virtual credentials and
-				anonymous bucket bindings. While it's off, the dashboard can't list, mint,
-				or revoke either — and tenant SDKs hitting the proxy endpoint will get
-				connection failures.
+				The embedded SigV4 proxy is the master switch for virtual credentials and anonymous bucket
+				bindings. While it's off, the dashboard can't list, mint, or revoke either — and tenant SDKs
+				hitting the proxy endpoint will get connection failures.
 			</div>
 			<div class="max-w-[640px] text-center">
 				Set <code>s3_proxy.enabled: true</code> (and a <code>s3_proxy.listen</code>
@@ -231,83 +239,127 @@
 		{/if}
 
 		{#if tab === 'credentials'}
-		{#if creds.length === 0 && !error}
-			{#snippet keyIcon()}<KeyRound size={22} strokeWidth={1.7} />{/snippet}
-			<EmptyState variant="card" icon={keyIcon} title="No virtual credentials yet.">
+			{#if creds.length === 0 && !error}
+				{#snippet keyIcon()}<KeyRound size={22} strokeWidth={1.7} />{/snippet}
+				<EmptyState variant="card" icon={keyIcon} title="No virtual credentials yet.">
+					<div>
+						Mint a credential to hand a tenant SDK its own scoped access. Operator-provisioned
+						credentials appear here automatically once <code>BucketClaim</code>s are reconciled.
+					</div>
+				</EmptyState>
+			{:else}
+				<DataTable columns={credColumns} rows={filteredCreds} emptyText="No credentials match.">
+					{#snippet row(c)}
+						<td class="px-3 font-mono text-[12.5px]">{c.access_key}</td>
+						<td class="px-3">
+							{#if c.source === 'kubernetes'}
+								<Tooltip
+									text={c.claim_namespace
+										? `${c.claim_namespace}/${c.claim_name ?? '?'}`
+										: 'BucketClaim Secret'}
+								>
+									<Badge variant="ok">
+										<Cloud size={10} strokeWidth={1.7} /> operator
+									</Badge>
+								</Tooltip>
+							{:else}
+								<Badge>
+									<ServerCog size={10} strokeWidth={1.7} /> ui
+								</Badge>
+							{/if}
+						</td>
+						<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">{c.backend_id}</td>
+						<td class="px-3">
+							<div class="flex max-w-[260px] flex-wrap gap-1">
+								{#each c.buckets.slice(0, 3) as b (b)}
+									<span
+										class="rounded bg-[var(--stw-bg-hover)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
+										>{b}</span
+									>
+								{/each}
+								{#if c.buckets.length > 3}
+									<span class="text-[11px] text-[var(--stw-fg-soft)]"
+										>+{c.buckets.length - 3} more</span
+									>
+								{/if}
+							</div>
+						</td>
+						<td class="px-3 text-[12px] text-[var(--stw-fg-mute)]">
+							{#if c.source === 'kubernetes'}
+								<span class="font-mono text-[11.5px]"
+									>{c.claim_namespace ?? '?'}/{c.claim_name ?? '?'}</span
+								>
+							{:else if c.user_id}
+								<span class="font-mono text-[11.5px]">{c.user_id}</span>
+							{:else}
+								—
+							{/if}
+						</td>
+						<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+							{expiresLabel(c.expires_at)}
+						</td>
+						<td class="px-3 text-right">
+							{#if c.source === 'sqlite'}
+								<Toggle value={c.enabled} onchange={(v) => toggleEnabled(c, v)} />
+							{:else if c.enabled}
+								<Badge variant="ok">active</Badge>
+							{:else}
+								<Badge>disabled</Badge>
+							{/if}
+						</td>
+						<td class="px-3 text-right">
+							{#if c.source === 'sqlite'}
+								{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
+								<Tooltip text="Delete">
+									<IconButton
+										label="Delete"
+										size={24}
+										icon={trashIcon}
+										onclick={() => destroyCred(c)}
+									/>
+								</Tooltip>
+							{:else}
+								<span class="text-[11px] text-[var(--stw-fg-soft)]">read-only</span>
+							{/if}
+						</td>
+					{/snippet}
+				</DataTable>
+			{/if}
+		{:else if bindings.length === 0 && !error}
+			{#snippet globeIcon()}<Globe size={22} strokeWidth={1.7} />{/snippet}
+			<EmptyState variant="card" icon={globeIcon} title="No anonymous bindings.">
 				<div>
-					Mint a credential to hand a tenant SDK its own scoped access. Operator-provisioned
-					credentials appear here automatically once <code>BucketClaim</code>s are reconciled.
+					Public read-only access for a single bucket can be exposed through the proxy without a
+					credential. Operator-managed bindings appear here automatically.
 				</div>
 			</EmptyState>
 		{:else}
-			<DataTable columns={credColumns} rows={filteredCreds} emptyText="No credentials match.">
-				{#snippet row(c)}
-					<td class="px-3 font-mono text-[12.5px]">{c.access_key}</td>
+			<DataTable columns={anonColumns} rows={filteredAnon} emptyText="No bindings match.">
+				{#snippet row(b)}
+					<td class="px-3 font-mono text-[12.5px]">{b.backend_id}/{b.bucket}</td>
 					<td class="px-3">
-						{#if c.source === 'kubernetes'}
-							<Tooltip
-								text={c.claim_namespace
-									? `${c.claim_namespace}/${c.claim_name ?? '?'}`
-									: 'BucketClaim Secret'}
-							>
-								<Badge variant="ok">
-									<Cloud size={10} strokeWidth={1.7} /> operator
-								</Badge>
-							</Tooltip>
+						{#if b.source === 'kubernetes'}
+							<Badge variant="ok"><Cloud size={10} strokeWidth={1.7} /> operator</Badge>
 						{:else}
-							<Badge>
-								<ServerCog size={10} strokeWidth={1.7} /> ui
-							</Badge>
+							<Badge><ServerCog size={10} strokeWidth={1.7} /> ui</Badge>
 						{/if}
 					</td>
-					<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">{c.backend_id}</td>
-					<td class="px-3">
-						<div class="flex max-w-[260px] flex-wrap gap-1">
-							{#each c.buckets.slice(0, 3) as b (b)}
-								<span
-									class="rounded bg-[var(--stw-bg-hover)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
-									>{b}</span
-								>
-							{/each}
-							{#if c.buckets.length > 3}
-								<span class="text-[11px] text-[var(--stw-fg-soft)]"
-									>+{c.buckets.length - 3} more</span
-								>
-							{/if}
-						</div>
+					<td class="px-3"><Badge>{b.mode}</Badge></td>
+					<td class="px-3 text-right font-mono text-[12px] text-[var(--stw-fg-mute)]">
+						{b.per_source_ip_rps}
 					</td>
-					<td class="px-3 text-[12px] text-[var(--stw-fg-mute)]">
-						{#if c.source === 'kubernetes'}
-							<span class="font-mono text-[11.5px]"
-								>{c.claim_namespace ?? '?'}/{c.claim_name ?? '?'}</span
-							>
-						{:else if c.user_id}
-							<span class="font-mono text-[11.5px]">{c.user_id}</span>
-						{:else}
-							—
-						{/if}
-					</td>
-					<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
-						{expiresLabel(c.expires_at)}
+					<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+						{b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'}
 					</td>
 					<td class="px-3 text-right">
-						{#if c.source === 'sqlite'}
-							<Toggle value={c.enabled} onchange={(v) => toggleEnabled(c, v)} />
-						{:else if c.enabled}
-							<Badge variant="ok">active</Badge>
-						{:else}
-							<Badge>disabled</Badge>
-						{/if}
-					</td>
-					<td class="px-3 text-right">
-						{#if c.source === 'sqlite'}
+						{#if b.source !== 'kubernetes'}
 							{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
-							<Tooltip text="Delete">
+							<Tooltip text="Remove">
 								<IconButton
-									label="Delete"
+									label="Remove"
 									size={24}
 									icon={trashIcon}
-									onclick={() => destroyCred(c)}
+									onclick={() => destroyBinding(b)}
 								/>
 							</Tooltip>
 						{:else}
@@ -317,50 +369,6 @@
 				{/snippet}
 			</DataTable>
 		{/if}
-	{:else if bindings.length === 0 && !error}
-		{#snippet globeIcon()}<Globe size={22} strokeWidth={1.7} />{/snippet}
-		<EmptyState variant="card" icon={globeIcon} title="No anonymous bindings.">
-			<div>
-				Public read-only access for a single bucket can be exposed through the proxy without a
-				credential. Operator-managed bindings appear here automatically.
-			</div>
-		</EmptyState>
-	{:else}
-		<DataTable columns={anonColumns} rows={filteredAnon} emptyText="No bindings match.">
-			{#snippet row(b)}
-				<td class="px-3 font-mono text-[12.5px]">{b.backend_id}/{b.bucket}</td>
-				<td class="px-3">
-					{#if b.source === 'kubernetes'}
-						<Badge variant="ok"><Cloud size={10} strokeWidth={1.7} /> operator</Badge>
-					{:else}
-						<Badge><ServerCog size={10} strokeWidth={1.7} /> ui</Badge>
-					{/if}
-				</td>
-				<td class="px-3"><Badge>{b.mode}</Badge></td>
-				<td class="px-3 text-right font-mono text-[12px] text-[var(--stw-fg-mute)]">
-					{b.per_source_ip_rps}
-				</td>
-				<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
-					{b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'}
-				</td>
-				<td class="px-3 text-right">
-					{#if b.source !== 'kubernetes'}
-						{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
-						<Tooltip text="Remove">
-							<IconButton
-								label="Remove"
-								size={24}
-								icon={trashIcon}
-								onclick={() => destroyBinding(b)}
-							/>
-						</Tooltip>
-					{:else}
-						<span class="text-[11px] text-[var(--stw-fg-soft)]">read-only</span>
-					{/if}
-				</td>
-			{/snippet}
-		</DataTable>
-	{/if}
 	{/if}
 </div>
 
