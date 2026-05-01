@@ -166,7 +166,7 @@ func validatingWebhookConfigs() []*admissionregv1.ValidatingWebhookConfiguration
 	pathBE := "/validate-broker-stowage-io-v1alpha1-s3backend"
 
 	return []*admissionregv1.ValidatingWebhookConfiguration{{
-		ObjectMeta: metav1.ObjectMeta{Name: "stowage-operator-validator"},
+		ObjectMeta: metav1.ObjectMeta{Name: "stowage-validator"},
 		Webhooks: []admissionregv1.ValidatingWebhook{
 			{
 				Name:                    "bucketclaim.stowage.test",

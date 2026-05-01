@@ -25,6 +25,17 @@
             "namespace" .Release.Namespace))
     "backends" (list)
 -}}
+{{- if .Values.operator.enabled -}}
+{{- $_ := set $base "operator" (dict
+    "enabled"       true
+    "ops_namespace" .Release.Namespace
+    "proxy_url"     (include "stowage.proxyEndpointURL" .)
+    "webhook"       (dict
+        "enabled" .Values.webhook.enabled
+        "port"    9443
+        "cert_dir" "/etc/stowage/webhook/certs"))
+-}}
+{{- end -}}
 {{- $merged := mergeOverwrite $base .Values.config -}}
 apiVersion: v1
 kind: ConfigMap

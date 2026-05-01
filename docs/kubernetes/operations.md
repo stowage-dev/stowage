@@ -14,11 +14,11 @@ kubectl -n my-app describe bucketclaim uploads
 
 The `Conditions:` section names the failing condition (`BucketCreated`,
 `CredentialsProvisioned`) and the reason (`EndpointUnreachable`,
-`CredentialsInvalid`, `BackendNotReady`). Cross-reference the operator
-logs:
+`CredentialsInvalid`, `BackendNotReady`). Cross-reference the stowage
+Pod logs (the operator manager runs inside it):
 
 ```sh
-kubectl -n stowage-system logs deploy/stowage-operator --tail=100 \
+kubectl -n stowage-system logs deploy/stowage --tail=100 \
   | grep my-app/uploads
 ```
 

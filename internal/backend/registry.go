@@ -37,13 +37,21 @@ type entry struct {
 
 // Source distinguishes how a backend got into the registry. The admin API
 // uses this to gate edits — only SourceDB entries can be modified through
-// the UI; SourceConfig entries are owned by config.yaml and read-only.
+// the UI; SourceConfig entries are owned by config.yaml, and SourceK8s
+// entries by S3Backend CRs reconciled by the embedded operator manager.
 type Source string
 
 const (
 	SourceConfig Source = "config"
 	SourceDB     Source = "db"
+	SourceK8s    Source = "k8s"
 )
+
+// IsReadOnly reports whether a Source is owned by an external system and
+// must not be mutated through the admin UI.
+func (s Source) IsReadOnly() bool {
+	return s == SourceConfig || s == SourceK8s
+}
 
 // historyMax caps each backend's probe history. The dashboard renders a
 // 20-bin sparkline so 20 is sufficient.

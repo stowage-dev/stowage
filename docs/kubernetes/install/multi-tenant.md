@@ -4,8 +4,9 @@ type: how-to
 
 # Multi-tenant install (chart + operator)
 
-The default Helm install. Deploys Stowage, the operator, and the
-admission webhook wired together. Recommended for new clusters.
+The default Helm install. Deploys Stowage with the operator manager
+and admission webhook embedded in the same Pod. Recommended for new
+clusters.
 
 ## Prerequisites
 
@@ -29,18 +30,16 @@ helm install stowage ./deploy/chart \
 
 ```
 namespace/stowage-system
-├── deployment/stowage
-├── deployment/stowage-operator
-├── service/stowage         # ports 8080, 8090
-├── pvc/stowage             # RWO, holds stowage.db + secret key
-├── ingress/stowage         # if ingress.enabled=true
-├── secret/stowage          # contains the AES-256 root key
-├── secret/stowage-config   # rendered config.yaml
-├── secret/stowage-webhook-cert  # if webhook.enabled=true
-├── service/stowage-webhook
-├── validatingwebhookconfiguration/stowage
-├── role + rolebinding (operator + stowage)
-└── clusterrole + clusterrolebinding (operator)
+├── deployment/stowage             # 1 replica: dashboard + S3 proxy + operator manager
+├── service/stowage                # 80 → http, 8090 → s3, 443 → webhook
+├── pvc/stowage-data               # RWO, holds stowage.db + secret key
+├── ingress/stowage                # if ingress.enabled=true
+├── secret/stowage-secret-key      # AES-256 root key
+├── configmap/stowage-config       # rendered config.yaml
+├── secret/stowage-webhook-cert    # if webhook.enabled=true
+├── validatingwebhookconfiguration/stowage-validating-webhook
+├── role + rolebinding/stowage     # namespaced Secret read for proxy informer
+└── clusterrole + clusterrolebinding/stowage  # operator manager
 ```
 
 Cluster-scoped:
@@ -56,11 +55,12 @@ crd/bucketclaims.broker.stowage.io
 kubectl -n stowage-system get pods
 kubectl -n stowage-system get svc,pvc,ingress
 kubectl get crd | grep stowage.io
-kubectl -n stowage-system logs deploy/stowage-operator | tail -20
+kubectl -n stowage-system logs deploy/stowage | tail -40
 ```
 
-The operator's startup log lists the controllers it registered (one
-for `S3Backend`, one for `BucketClaim`).
+The startup log lists the HTTP listener, the embedded S3 proxy, and
+(when `operator.enabled`) the operator manager booting its
+reconcilers and webhook.
 
 ## Bootstrap the first admin
 

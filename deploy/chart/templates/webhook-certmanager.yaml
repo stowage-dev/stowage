@@ -1,14 +1,14 @@
-{{- if and .Values.operator.enabled .Values.webhook.enabled .Values.webhook.certManager.enabled }}
+{{- if and .Values.stowage.enabled .Values.operator.enabled .Values.webhook.enabled .Values.webhook.certManager.enabled }}
 {{- if not .Values.webhook.certManager.issuerRef.name }}
 # Chart-managed self-signed Issuer for clusters that have cert-manager but
 # no pre-existing Issuer to delegate to.
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: stowage-operator-selfsigned
+  name: stowage-webhook-selfsigned
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "stowage.operatorLabels" . | nindent 4 }}
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
 spec:
   selfSigned: {}
 ---
@@ -16,17 +16,17 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: stowage-operator-webhook-cert
+  name: stowage-webhook-cert
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "stowage.operatorLabels" . | nindent 4 }}
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
 spec:
-  secretName: stowage-operator-webhook-cert
+  secretName: stowage-webhook-cert
   dnsNames:
-    - stowage-operator-webhook.{{ .Release.Namespace }}
-    - stowage-operator-webhook.{{ .Release.Namespace }}.svc
-    - stowage-operator-webhook.{{ .Release.Namespace }}.svc.cluster.local
+    - stowage.{{ .Release.Namespace }}
+    - stowage.{{ .Release.Namespace }}.svc
+    - stowage.{{ .Release.Namespace }}.svc.cluster.local
   issuerRef:
     kind: {{ .Values.webhook.certManager.issuerRef.kind }}
-    name: {{ .Values.webhook.certManager.issuerRef.name | default "stowage-operator-selfsigned" }}
+    name: {{ .Values.webhook.certManager.issuerRef.name | default "stowage-webhook-selfsigned" }}
 {{- end }}

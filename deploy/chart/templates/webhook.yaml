@@ -1,30 +1,15 @@
-{{- if and .Values.operator.enabled .Values.webhook.enabled }}
+{{- if and .Values.stowage.enabled .Values.operator.enabled .Values.webhook.enabled }}
 {{- $caBundle := include "stowage.webhookCABundle" . | trim -}}
 {{- $certManagerAnnotation := "" -}}
 {{- if .Values.webhook.certManager.enabled -}}
-  {{- $certManagerAnnotation = printf "cert-manager.io/inject-ca-from: %s/stowage-operator-webhook-cert" .Release.Namespace -}}
+  {{- $certManagerAnnotation = printf "cert-manager.io/inject-ca-from: %s/stowage-webhook-cert" .Release.Namespace -}}
 {{- end -}}
-apiVersion: v1
-kind: Service
-metadata:
-  name: stowage-operator-webhook
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "stowage.operatorLabels" . | nindent 4 }}
-spec:
-  selector:
-    {{- include "stowage.operatorSelector" . | nindent 4 }}
-  ports:
-    - name: webhook
-      port: 443
-      targetPort: webhook
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: stowage-operator-validating-webhook
+  name: stowage-validating-webhook
   labels:
-    {{- include "stowage.operatorLabels" . | nindent 4 }}
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
   {{- if $certManagerAnnotation }}
   annotations:
     {{ $certManagerAnnotation }}
@@ -37,8 +22,9 @@ webhooks:
     timeoutSeconds: 10
     clientConfig:
       service:
-        name: stowage-operator-webhook
+        name: stowage
         namespace: {{ .Release.Namespace }}
+        port: 443
         path: /validate-broker-stowage-io-v1alpha1-s3backend
       {{- if $caBundle }}
       caBundle: {{ $caBundle }}
@@ -56,8 +42,9 @@ webhooks:
     timeoutSeconds: 10
     clientConfig:
       service:
-        name: stowage-operator-webhook
+        name: stowage
         namespace: {{ .Release.Namespace }}
+        port: 443
         path: /validate-broker-stowage-io-v1alpha1-bucketclaim
       {{- if $caBundle }}
       caBundle: {{ $caBundle }}

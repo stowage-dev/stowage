@@ -24,6 +24,7 @@ import (
 	"github.com/stowage-dev/stowage/internal/backend"
 	"github.com/stowage-dev/stowage/internal/config"
 	"github.com/stowage-dev/stowage/internal/metrics"
+	opmgr "github.com/stowage-dev/stowage/internal/operator/manager"
 	"github.com/stowage-dev/stowage/internal/quotas"
 	"github.com/stowage-dev/stowage/internal/s3proxy"
 	"github.com/stowage-dev/stowage/internal/secrets"
@@ -403,10 +404,12 @@ func (s *Server) Run(ctx context.Context) error {
 		}()
 	}
 
-	// Two listeners share one error channel: a fatal listen() error from
-	// either tears the process down. http.ErrServerClosed (shutdown path)
-	// is normalised to nil so we don't surface it as a failure.
-	errCh := make(chan error, 2)
+	// Long-running goroutines (HTTP, optional S3 proxy listener, optional
+	// operator manager) share one error channel: a fatal exit from any tears
+	// the process down. http.ErrServerClosed (shutdown path) is normalised
+	// to nil so we don't surface it as a failure.
+	errCh := make(chan error, 3)
+	pending := 1
 	go func() {
 		err := s.http.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {
@@ -414,6 +417,23 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		errCh <- err
 	}()
+	if s.cfg.Operator.Enabled {
+		pending++
+		go func() {
+			errCh <- opmgr.Start(ctx, opmgr.Config{
+				Kubeconfig:   s.cfg.Operator.Kubeconfig,
+				MetricsAddr:  s.cfg.Operator.MetricsAddr,
+				OpsNamespace: s.cfg.Operator.OpsNamespace,
+				ProxyURL:     s.cfg.Operator.ProxyURL,
+				Registry:     s.registry,
+				Webhook: opmgr.WebhookConfig{
+					Enabled: s.cfg.Operator.Webhook.Enabled,
+					Port:    s.cfg.Operator.Webhook.Port,
+					CertDir: s.cfg.Operator.Webhook.CertDir,
+				},
+			}, s.logger)
+		}()
+	}
 	if s.s3http != nil {
 		// Start K8s informer first so the cache is primed before we accept
 		// proxy traffic. A short timeout keeps boots from hanging
@@ -428,6 +448,7 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}
 		go s.s3sqlite.Run(ctx, s.s3reloadIv)
+		pending++
 		go func() {
 			s.logger.Info("s3 proxy listening", "addr", s.s3http.Addr)
 			err := s.s3http.ListenAndServe()
@@ -498,10 +519,10 @@ func (s *Server) Run(ctx context.Context) error {
 		if shutdownErr != nil {
 			return shutdownErr
 		}
-		// Drain remaining listener errors. With 1–2 ListenAndServe
-		// goroutines, both will have published nil after Shutdown returns.
-		<-errCh
-		if s.s3http != nil {
+		// Drain remaining background-goroutine errors. The operator
+		// manager exits when ctx is done; both listeners exit when
+		// Shutdown returns. All publish nil on clean exit.
+		for i := 0; i < pending; i++ {
 			<-errCh
 		}
 		return nil

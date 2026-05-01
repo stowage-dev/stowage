@@ -1,13 +1,13 @@
-{{- if and .Values.operator.enabled .Values.webhook.enabled .Values.webhook.selfSigned.enabled }}
+{{- if and .Values.stowage.enabled .Values.operator.enabled .Values.webhook.enabled .Values.webhook.selfSigned.enabled }}
 {{- $cert := fromJson (include "stowage.webhookCert" .) }}
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/tls
 metadata:
-  name: stowage-operator-webhook-cert
+  name: stowage-webhook-cert
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "stowage.operatorLabels" . | nindent 4 }}
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
 data:
   tls.crt: {{ $cert.tlsCrt | quote }}
   tls.key: {{ $cert.tlsKey | quote }}
