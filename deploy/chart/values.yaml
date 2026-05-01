@@ -14,7 +14,7 @@
 image:
   registry: ghcr.io/stowage-dev
   tag: dev
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Names of existing dockerconfigjson Secrets in the release namespace to attach
   # as imagePullSecrets on every Pod. The chart does not create these.
   pullSecrets: []
@@ -29,11 +29,12 @@ storage:
 # Optional Ingress for the dashboard. Stowage expects to sit behind a
 # TLS-terminating proxy.
 ingress:
-  enabled: false
+  enabled: true
   className: ""
-  host: ""
-  annotations: {}
-  tls: false
+  host: "stowage.rke2-prod.mustard.co.nz"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls: true
 
 # Verbatim YAML merged on top of the chart's generated stowage config.yaml.
 # Use this for OIDC, audit sampling, rate-limit overrides, host suffixes,
@@ -75,3 +76,12 @@ operator:
 
 networkPolicy:
   enabled: false
+
+# /metrics is always served at :8080/metrics on the main HTTP listener.
+# This block controls how external scrapers discover it.
+metrics:
+  # When true, adds prometheus.io/scrape, /port, and /path annotations
+  # to the Pod so a Prometheus instance configured for pod auto-discovery
+  # picks up /metrics automatically. Leave false when you scrape via a
+  # ServiceMonitor or static targets.
+  prometheusScrape: true

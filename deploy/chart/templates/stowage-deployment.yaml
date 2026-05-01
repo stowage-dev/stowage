@@ -26,6 +26,11 @@ spec:
         {{- if and .Values.operator.enabled .Values.webhook.enabled }}
         checksum/webhook-cert: {{ include "stowage.webhookCABundle" . | sha256sum }}
         {{- end }}
+        {{- if .Values.metrics.prometheusScrape }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        {{- end }}
     spec:
       serviceAccountName: stowage
       {{- with (include "stowage.imagePullSecrets" . | trim) }}
