@@ -28,15 +28,10 @@ import (
 	"github.com/stowage-dev/stowage/internal/operator/webhook"
 )
 
-// Config governs the embedded operator manager. Fields mirror the flags the
-// historical cmd/operator binary accepted; defaults are applied by the
-// config package.
+// Config governs the embedded operator manager. Stowage runs single-replica
+// (SQLite + in-process limiter), so leader election is intentionally absent —
+// there is never a second pod to contest a lease.
 type Config struct {
-	// LeaderElection enables single-active-reconciler semantics across
-	// replicas. Safe to leave on with replicas=1; required with replicas>1.
-	LeaderElection   bool
-	LeaderElectionID string
-
 	// Kubeconfig is an optional path to a kubeconfig file. Empty means
 	// in-cluster configuration.
 	Kubeconfig string
@@ -82,10 +77,8 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	utilruntime.Must(brokerv1a1.AddToScheme(sch))
 
 	mgrOpts := ctrl.Options{
-		Scheme:           sch,
-		Metrics:          metricsserver.Options{BindAddress: cfg.MetricsAddr},
-		LeaderElection:   cfg.LeaderElection,
-		LeaderElectionID: cfg.LeaderElectionID,
+		Scheme:  sch,
+		Metrics: metricsserver.Options{BindAddress: cfg.MetricsAddr},
 	}
 	if cfg.Webhook.Enabled {
 		mgrOpts.WebhookServer = webhookserver.NewServer(webhookserver.Options{
@@ -132,7 +125,6 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	}
 
 	logger.Info("operator manager starting",
-		"leader_election", cfg.LeaderElection,
 		"webhook_enabled", cfg.Webhook.Enabled,
 		"ops_namespace", cfg.OpsNamespace)
 	if err := mgr.Start(ctx); err != nil {

@@ -39,5 +39,52 @@ subjects:
   - kind: ServiceAccount
     name: stowage
     namespace: {{ .Release.Namespace }}
+---
+# Cluster-wide permissions for the embedded operator manager: it reconciles
+# S3Backend / BucketClaim CRs (cluster-scoped + namespaced) and writes
+# consumer Secrets into arbitrary tenant namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: stowage
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+rules:
+  - apiGroups: [broker.stowage.io]
+    resources: [s3backends, bucketclaims]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [broker.stowage.io]
+    resources: [s3backends/status, bucketclaims/status]
+    verbs: [get, update, patch]
+  - apiGroups: [broker.stowage.io]
+    resources: [bucketclaims/finalizers]
+    verbs: [update]
+  # Cluster-scoped Secret access: consumer Secrets land in tenant namespaces.
+  # Internal Secrets (admin + virtual creds + webhook TLS) all live in
+  # .Release.Namespace, but the consumer-side writer needs to reach arbitrary
+  # namespaces.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
+  # No coordination.k8s.io/leases rule: stowage is single-replica, so the
+  # operator manager runs without leader election.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: stowage
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: stowage
+subjects:
+  - kind: ServiceAccount
+    name: stowage
+    namespace: {{ .Release.Namespace }}
 {{- end }}
 {{- end }}
