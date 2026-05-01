@@ -4,28 +4,42 @@ type: how-to
 
 # Kubernetes overview
 
-The Stowage Helm chart deploys two components that are coupled by a
-contract on Kubernetes Secret data fields. Anything else in the
-cluster is consumer-only — your application Pods consume the Secrets
-the operator writes, but they don't speak directly to either Stowage
-process.
+The Stowage Helm chart deploys a single Pod that runs the dashboard,
+the embedded SigV4 proxy, and the operator manager together. Anything
+else in the cluster is consumer-only — your application Pods consume
+the Secrets the operator writes, but they don't speak directly to
+the stowage process.
 
 ## Components
 
-| Resource | Purpose | Replicas |
-|---|---|---|
-| Stowage Deployment | The dashboard process and the embedded SigV4 proxy. | 1 |
-| Operator Deployment | Reconciles `S3Backend` and `BucketClaim`. | 1 |
-| Admission webhook | Validates CRD changes. | 0–1 (depends on `webhook.enabled`) |
-| Stowage Service | ClusterIP, ports 8080 + 8090 | — |
-| Stowage Ingress | optional | — |
-| Stowage PVC | RWO, holds the SQLite database and the AES-256 root key | — |
-| `S3Backend` CRD | Cluster-scoped. | — |
-| `BucketClaim` CRD | Namespaced. | — |
+| Resource | Purpose |
+|---|---|
+| Stowage Deployment (1 replica) | Dashboard, embedded SigV4 proxy, and the operator manager (S3Backend / BucketClaim reconcilers + admission webhook), all in one container. |
+| Stowage Service | ClusterIP. Ports 80 → http, 8090 → s3 proxy, 443 → webhook (when enabled). |
+| Stowage Ingress | Optional. |
+| Stowage PVC | RWO. Holds the SQLite database and the AES-256 root key. |
+| Validating webhook | Validates `S3Backend` / `BucketClaim` writes. Targets the stowage Service. |
+| `S3Backend` CRD | Cluster-scoped. |
+| `BucketClaim` CRD | Namespaced. |
 
-Stowage runs single-replica because of SQLite + the in-process
-limiter. The chart sets `replicas: 1` and uses an RWO PVC. Multi-
-replica Stowage is on the roadmap; today it is not supported.
+## Single-replica deployment is the only supported topology
+
+Stowage is backed by SQLite on an RWO volume and an in-process
+rate-limiter / audit batcher / quota counter. Running a second pod
+would race on the database, double-execute reconciles, and split
+the rate-limit + audit state. The chart hardcodes `replicas: 1`
+with `strategy: Recreate` and the operator manager runs without
+leader election. **Multi-replica is not supported and is not on
+the roadmap** — if you need HA, deploy a second stowage cluster
+in a separate namespace or cluster and point at a different
+upstream.
+
+The merged-pod deployment also means dashboard and operator share
+a fate: a pod restart drops admission availability for the
+restart window. The chart's webhook `failurePolicy` defaults to
+`Fail` (writes to CRs are blocked while the pod is down); flip it
+to `Ignore` in `values.yaml` if you'd rather accept unvalidated
+writes during restarts.
 
 ## Data flow at install time
 
@@ -34,8 +48,8 @@ helm install
    ├─ creates the namespace
    ├─ generates the AES-256 root key (helm lookup preserves on upgrade)
    ├─ deploys Stowage (PVC + Service + Deployment)
-   ├─ deploys the operator (Deployment + RBAC)
-   ├─ installs the admission webhook (Service + cert)
+   ├─ installs the cluster + namespaced RBAC for the operator manager
+   ├─ installs the admission webhook (cert + ValidatingWebhookConfiguration)
    └─ installs the CRDs
 ```
 
@@ -45,13 +59,16 @@ helm install
 developer ─ kubectl apply ──▶ S3Backend / BucketClaim
                                      │
                                      ▼
-                       ┌──────────────────────────┐
-                       │ stowage-operator         │
-                       │  • verifies upstream     │
-                       │  • creates the bucket    │
-                       │  • mints virtual creds   │
-                       │  • writes Secret         │
-                       └──────────────────────────┘
+                       ┌──────────────────────────────────┐
+                       │ stowage Pod                      │
+                       │  ├─ operator manager             │
+                       │  │   • verifies upstream         │
+                       │  │   • creates the bucket        │
+                       │  │   • mints virtual creds       │
+                       │  │   • writes Secret             │
+                       │  ├─ embedded S3 SigV4 proxy      │
+                       │  └─ admin dashboard              │
+                       └──────────────────────────────────┘
                                      │
                                      ▼
                        ┌──────────────────────────┐
@@ -67,14 +84,14 @@ developer ─ kubectl apply ──▶ S3Backend / BucketClaim
                        │   S3_ADDRESSING_STYLE    │
                        └──────────────────────────┘
                                      │
-                       ┌─────────────┘─────────────┐
-                       ▼                           ▼
-              consumer Pod (mounts          stowage proxy
-              Secret as env)                informer (reads
-                                            internal Secrets)
-                       │                           │
-                       └──────── SigV4 ────────────▶
-                                                 upstream S3
+                                     ▼
+              consumer Pod (mounts Secret as env)
+                                     │
+                                     ▼
+                            stowage Service :8090
+                                     │
+                                     ▼
+                              upstream S3
 ```
 
 ## Wire-contract Secret data fields

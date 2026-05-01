@@ -29,12 +29,12 @@ type Config struct {
 // manager that reconciles S3Backend / BucketClaim CRs and serves their
 // admission webhooks. Disabled by default — opting in requires a working
 // kubeconfig (in-cluster or explicit path) and the CRDs already installed.
+//
+// Stowage runs single-replica by design (SQLite + in-process limiter), so
+// leader election is intentionally absent: there is never a second pod to
+// contest a lease.
 type OperatorConfig struct {
 	Enabled bool `yaml:"enabled"`
-	// LeaderElection ensures a single active reconciler when the binary is
-	// scaled to multiple replicas. Safe to leave on with one replica.
-	LeaderElection   bool   `yaml:"leader_election"`
-	LeaderElectionID string `yaml:"leader_election_id"`
 	// Kubeconfig is an optional path to a kubeconfig file. Empty means
 	// in-cluster configuration.
 	Kubeconfig string `yaml:"kubeconfig"`
@@ -306,10 +306,8 @@ func Defaults() Config {
 			},
 		},
 		Operator: OperatorConfig{
-			LeaderElection:   true,
-			LeaderElectionID: "stowage.broker.stowage.io",
-			OpsNamespace:     "stowage-system",
-			ProxyURL:         "http://stowage-proxy.stowage-system.svc.cluster.local:8080",
+			OpsNamespace: "stowage-system",
+			ProxyURL:     "http://stowage-proxy.stowage-system.svc.cluster.local:8080",
 			Webhook: OperatorWebhookConfig{
 				Enabled: true,
 				Port:    9443,

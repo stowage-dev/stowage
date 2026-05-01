@@ -20,4 +20,12 @@ spec:
     - name: s3
       port: 8090
       targetPort: s3
+    {{- if and .Values.operator.enabled .Values.webhook.enabled }}
+    # Admission webhook served by the operator manager that runs inside
+    # the same pod. ValidatingWebhookConfiguration targets this Service
+    # on port 443.
+    - name: webhook
+      port: 443
+      targetPort: webhook
+    {{- end }}
 {{- end }}

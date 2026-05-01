@@ -1,9 +1,15 @@
 # Stowage chart — deploys the dashboard, embedded S3 SigV4 proxy, and the
-# operator wired together in one namespace. Override only what you need;
-# every other knob is rendered with a working default by the templates.
+# operator wired together in one Pod. Override only what you need; every
+# other knob is rendered with a working default by the templates.
 #
 # The chart deploys into the Helm release namespace. Pick it at install time
 # with `helm install stowage ./chart -n stowage-system --create-namespace`.
+#
+# Topology: single replica only. Stowage is backed by SQLite on an RWO PVC
+# and an in-process rate-limiter / audit batcher; running two pods would
+# corrupt the database and double-execute reconciles. The chart hardcodes
+# replicas: 1 with strategy: Recreate. Multi-replica is not supported and
+# is not on the roadmap; deploy a second cluster instead if you need HA.
 
 image:
   registry: ghcr.io/stowage-dev
@@ -54,10 +60,16 @@ webhook:
       name: ""
   caBundle: ""
 
-# Per-component disable. Both default to on; flip one off to deploy the
-# other standalone (e.g. operator-only if stowage already runs elsewhere).
+# Master switch for the chart. When false, no Deployment, Service, RBAC,
+# config, or webhook is rendered (only the CRDs in chart/crds/ install).
 stowage:
   enabled: true
+
+# Embed the controller-runtime operator manager inside the stowage pod.
+# When true, the same pod reconciles S3Backend / BucketClaim CRs, serves
+# the admission webhook, and writes consumer Secrets across namespaces;
+# this also widens RBAC to cluster scope. When false, the pod runs only
+# the dashboard + S3 proxy and Kubernetes RBAC stays namespace-scoped.
 operator:
   enabled: true
 
