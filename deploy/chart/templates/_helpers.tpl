@@ -20,17 +20,6 @@ app.kubernetes.io/name: stowage
 app.kubernetes.io/component: dashboard
 {{- end -}}
 
-{{- define "stowage.operatorLabels" -}}
-{{ include "stowage.commonLabels" . }}
-app.kubernetes.io/name: stowage-operator
-app.kubernetes.io/component: operator
-{{- end -}}
-
-{{- define "stowage.operatorSelector" -}}
-app.kubernetes.io/name: stowage-operator
-app.kubernetes.io/component: operator
-{{- end -}}
-
 {{/*
   In-cluster URL the operator stamps into every consumer Secret as
   AWS_ENDPOINT_URL. Points at the stowage Service on the embedded proxy
@@ -92,12 +81,12 @@ imagePullSecrets:
 {{- define "stowage.webhookCert" -}}
 {{- if not (hasKey .Values "_webhookCertCache") -}}
   {{- $cache := dict -}}
-  {{- $svc := printf "stowage-operator-webhook.%s.svc" .Release.Namespace -}}
+  {{- $svc := printf "stowage.%s.svc" .Release.Namespace -}}
   {{- $altNames := list
-      (printf "stowage-operator-webhook.%s" .Release.Namespace)
+      (printf "stowage.%s" .Release.Namespace)
       $svc
       (printf "%s.cluster.local" $svc) -}}
-  {{- $existing := lookup "v1" "Secret" .Release.Namespace "stowage-operator-webhook-cert" -}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace "stowage-webhook-cert" -}}
   {{- if and $existing (hasKey (default (dict) $existing.data) "tls.crt") (hasKey (default (dict) $existing.data) "ca.crt") -}}
     {{- $cache = dict
         "caCrt"  (index $existing.data "ca.crt")
@@ -105,7 +94,7 @@ imagePullSecrets:
         "tlsKey" (index $existing.data "tls.key") -}}
   {{- else -}}
     {{- $days := int .Values.webhook.selfSigned.validityDays -}}
-    {{- $ca := genCA "stowage-operator-webhook-ca" $days -}}
+    {{- $ca := genCA "stowage-webhook-ca" $days -}}
     {{- $cert := genSignedCert $svc nil $altNames $days $ca -}}
     {{- $cache = dict
         "caCrt"  ($ca.Cert | b64enc)

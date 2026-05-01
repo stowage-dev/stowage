@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package webhook holds the admission validators for the operator CRDs.
-// These run as part of the operator binary; see cmd/operator/main.go for the
-// wiring and deploy/chart/templates/webhook.yaml for the cluster
-// registration.
+// They are wired into the controller-runtime manager by
+// internal/operator/manager and registered with the cluster via
+// deploy/chart/templates/webhook.yaml.
 package webhook
 
 import (

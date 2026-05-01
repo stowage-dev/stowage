@@ -23,6 +23,9 @@ spec:
         # Roll the Pod when the rendered config or sealing key changes.
         checksum/config: {{ include (print $.Template.BasePath "/stowage-config.yaml") . | sha256sum }}
         checksum/secret-key: {{ include "stowage.secretKey" . | sha256sum }}
+        {{- if and .Values.operator.enabled .Values.webhook.enabled }}
+        checksum/webhook-cert: {{ include "stowage.webhookCABundle" . | sha256sum }}
+        {{- end }}
     spec:
       serviceAccountName: stowage
       {{- with (include "stowage.imagePullSecrets" . | trim) }}
@@ -32,6 +35,8 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
+        # fsGroup makes Secret volumes group-readable by 65532 so the
+        # non-root container can read tls.crt / tls.key at 0440.
         fsGroup: 65532
         seccompProfile: {type: RuntimeDefault}
       containers:
@@ -52,12 +57,21 @@ spec:
               containerPort: 8080
             - name: s3
               containerPort: 8090
+            {{- if and .Values.operator.enabled .Values.webhook.enabled }}
+            - name: webhook
+              containerPort: 9443
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /etc/stowage
               readOnly: true
             - name: data
               mountPath: /data
+            {{- if and .Values.operator.enabled .Values.webhook.enabled }}
+            - name: webhook-certs
+              mountPath: /etc/stowage/webhook/certs
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet: {path: /healthz, port: http}
             initialDelaySeconds: 5
@@ -80,4 +94,10 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: stowage-data
+        {{- if and .Values.operator.enabled .Values.webhook.enabled }}
+        - name: webhook-certs
+          secret:
+            secretName: stowage-webhook-cert
+            defaultMode: 0440
+        {{- end }}
 {{- end }}
