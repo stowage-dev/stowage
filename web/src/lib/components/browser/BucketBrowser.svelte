@@ -530,31 +530,31 @@
 >
 	<!-- Toolbar -->
 	<div
-		class="flex min-h-[44px] flex-shrink-0 flex-wrap items-center gap-2.5 border-b border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3.5 py-1.5"
+		class="flex min-h-[44px] flex-shrink-0 flex-wrap items-center gap-2.5 border-b border-stw-border bg-stw-bg-panel px-3.5 py-1.5"
 	>
-		<div class="flex items-center gap-1.5 text-[12.5px] text-[var(--stw-fg-mute)]">
+		<div class="flex items-center gap-1.5 text-[12.5px] text-stw-fg-mute">
 			<BackendMark {kind} size={14} />
 			<span class="font-mono">{items.length}</span>
 			<span>{filter ? 'matches' : 'items'} ·</span>
 			<span class="font-mono">{bytes(totalSize)}</span>
 			{#if filter && items.length !== allItems.length}
-				<span class="text-[11.5px] text-[var(--stw-fg-soft)]">of {allItems.length}</span>
+				<span class="text-[11.5px] text-stw-fg-soft">of {allItems.length}</span>
 			{/if}
 			{#if !backend.capabilities.versioning}
-				<span class="px-1 text-[var(--stw-fg-soft)]">·</span>
+				<span class="px-1 text-stw-fg-soft">·</span>
 				<Tooltip text="This backend doesn't expose versioning">
-					<span class="inline-flex items-center gap-1 text-[11.5px] text-[var(--stw-fg-soft)]">
+					<span class="inline-flex items-center gap-1 text-[11.5px] text-stw-fg-soft">
 						<Info size={11} strokeWidth={1.7} /> versioning unavailable
 					</span>
 				</Tooltip>
 			{/if}
 			{#if listing?.is_truncated}
-				<span class="text-[11.5px] text-[var(--stw-warn)]">· listing truncated</span>
+				<span class="text-[11.5px] text-stw-warn">· listing truncated</span>
 			{/if}
 		</div>
 		<span class="flex-1"></span>
 		{#if selected.length > 0}
-			<div class="flex items-center gap-2 text-[12.5px] text-[var(--stw-fg)]">
+			<div class="flex items-center gap-2 text-[12.5px] text-stw-fg">
 				<span class="font-medium">{selected.length} selected</span>
 				{#snippet downloadIcon()}<Download size={12} strokeWidth={1.7} />{/snippet}
 				{#snippet trashIcon()}<Trash2 size={12} strokeWidth={1.7} />{/snippet}
@@ -575,7 +575,7 @@
 				<button
 					type="button"
 					onclick={() => (selected = [])}
-					class="cursor-pointer border-0 bg-transparent p-1 text-[var(--stw-fg-mute)] hover:text-[var(--stw-fg)]"
+					class="cursor-pointer border-0 bg-transparent p-1 text-stw-fg-mute hover:text-stw-fg"
 					aria-label="Clear selection"
 				>
 					<X size={13} strokeWidth={1.7} />
@@ -621,7 +621,7 @@
 	</div>
 
 	{#if quotaBanner}
-		<div class="flex-shrink-0 border-b border-[var(--stw-border)]">
+		<div class="flex-shrink-0 border-b border-stw-border">
 			<Banner
 				variant={quotaBanner.tone === 'danger' ? 'err' : 'warn'}
 				title={quotaBanner.title}
@@ -633,7 +633,7 @@
 						<button
 							type="button"
 							onclick={() => goto(`/b/${backend.id}/${bucket}/settings`)}
-							class="stw-focus cursor-pointer rounded-[5px] border border-[var(--stw-border)] bg-transparent px-2 py-1 text-[11.5px] text-[var(--stw-fg)] hover:bg-[var(--stw-bg-hover)]"
+							class="cursor-pointer rounded-[5px] border border-stw-border bg-transparent px-2 py-1 text-[11.5px] text-stw-fg focus-ring hover:bg-stw-bg-hover"
 						>
 							Manage quota
 						</button>
@@ -646,7 +646,7 @@
 	{#if creatingFolder}
 		<form
 			onsubmit={submitFolder}
-			class="flex items-center gap-2 border-b border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-3.5 py-2.5"
+			class="flex items-center gap-2 border-b border-stw-border bg-stw-bg-sunken px-3.5 py-2.5"
 		>
 			<input
 				class="stw-input h-[30px] flex-1 font-mono text-[13px]"
@@ -772,14 +772,12 @@
 						? 'A file with this name already exists in this location.'
 						: 'These files already exist in this location:'}
 				</div>
-				<ul
-					class="m-0 max-h-[160px] overflow-auto pl-[18px] font-mono text-[12px] text-[var(--stw-fg)]"
-				>
+				<ul class="m-0 max-h-[160px] overflow-auto pl-[18px] font-mono text-[12px] text-stw-fg">
 					{#each names.slice(0, 8) as n (n)}
 						<li class="truncate">{n}</li>
 					{/each}
 					{#if names.length > 8}
-						<li class="text-[var(--stw-fg-soft)] italic">
+						<li class="text-stw-fg-soft italic">
 							…and {names.length - 8} more
 						</li>
 					{/if}
@@ -791,16 +789,15 @@
 	<!-- Drop overlay -->
 	{#if dragOver}
 		<div
-			class="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center border-2 border-dashed border-[var(--stw-accent-500)]"
-			style="background:color-mix(in oklch, var(--stw-accent-500) 14%, transparent);"
+			class="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center border-2 border-dashed border-stw-accent-500 stw-drag-tint"
 		>
 			<div
-				class="flex items-center gap-2.5 rounded-[10px] bg-[var(--stw-bg-panel)] px-[22px] py-4 shadow-[var(--stw-shadow-lg)]"
+				class="flex items-center gap-2.5 rounded-[10px] bg-stw-bg-panel px-[22px] py-4 shadow-stw-lg"
 			>
 				<Upload size={18} strokeWidth={1.7} />
 				<div>
 					<div class="text-[14px] font-semibold">Drop to upload</div>
-					<div class="font-mono text-[12px] text-[var(--stw-fg-mute)]">
+					<div class="font-mono text-[12px] text-stw-fg-mute">
 						→ {backend.id}/{bucket}/{s3Prefix()}
 					</div>
 				</div>

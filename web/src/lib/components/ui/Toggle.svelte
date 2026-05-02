@@ -15,14 +15,13 @@
 	aria-checked={value}
 	aria-label="Toggle"
 	onclick={() => onchange(!value)}
-	class="stw-focus"
-	style="position:relative;width:32px;height:18px;border:0;border-radius:999px;padding:0;background:{value
-		? 'var(--stw-accent-600)'
-		: 'var(--stw-n-200)'};transition:background 120ms;cursor:pointer;"
+	class="relative h-[18px] w-8 cursor-pointer rounded-full border-0 p-0 focus-ring transition-colors duration-[120ms] {value
+		? 'bg-stw-accent-600'
+		: 'bg-stw-n-200'}"
 >
 	<i
-		style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transform:{value
-			? 'translateX(14px)'
-			: 'none'};transition:transform 120ms;box-shadow:0 1px 2px rgba(0,0,0,.25);"
+		class="absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform duration-[120ms] {value
+			? 'translate-x-3.5'
+			: ''}"
 	></i>
 </button>

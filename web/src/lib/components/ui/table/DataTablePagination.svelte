@@ -19,16 +19,16 @@
 	const end = $derived(Math.min(total, (state.pageIndex + 1) * state.pageSize));
 
 	const btnCls =
-		'stw-focus inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)] hover:text-[var(--stw-fg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--stw-fg-mute)]';
+		'focus-ring inline-flex h-6 w-6 items-center justify-center rounded-md text-stw-fg-mute hover:bg-stw-bg-hover hover:text-stw-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-stw-fg-mute';
 </script>
 
 <div
-	class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3 py-2 text-[12px] text-[var(--stw-fg-mute)]"
+	class="flex flex-wrap items-center justify-between gap-3 border-t border-stw-border bg-stw-bg-panel px-3 py-2 text-[12px] text-stw-fg-mute"
 >
 	<div class="flex items-center gap-2">
 		<span class="font-mono">{num(start)}–{num(end)} of {num(total)}</span>
 		<label class="ml-2 inline-flex items-center gap-1.5">
-			<span class="text-[11.5px] text-[var(--stw-fg-soft)]">Rows</span>
+			<span class="text-[11.5px] text-stw-fg-soft">Rows</span>
 			<select
 				class="stw-input h-6 py-0 pr-5 pl-2 font-mono text-[11.5px]"
 				value={state.pageSize}

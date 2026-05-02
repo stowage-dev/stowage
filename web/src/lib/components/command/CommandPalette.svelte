@@ -150,26 +150,26 @@
 	onkeydown={(e) => {
 		if (e.key === 'Escape') onclose();
 	}}
-	class="fixed inset-0 z-[var(--stw-z-modal)] flex items-start justify-center bg-black/35 pt-[100px]"
+	class="fixed inset-0 z-50 flex items-start justify-center bg-black/35 pt-[100px]"
 >
 	<div
 		onclick={(e) => e.stopPropagation()}
 		role="presentation"
-		class="w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[10px] border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] shadow-[var(--stw-shadow-lg)]"
+		class="w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[10px] border border-stw-border bg-stw-bg-panel shadow-stw-lg"
 	>
-		<div class="flex items-center gap-2.5 border-b border-[var(--stw-border)] px-3.5 py-2.5">
+		<div class="flex items-center gap-2.5 border-b border-stw-border px-3.5 py-2.5">
 			<Search size={15} strokeWidth={1.7} />
 			<input
 				bind:this={inputEl}
 				bind:value={q}
 				placeholder="Type a command, bucket, or user…"
-				class="h-[28px] flex-1 border-0 bg-transparent text-[14px] text-[var(--stw-fg)] outline-0"
+				class="h-[28px] flex-1 border-0 bg-transparent text-[14px] text-stw-fg outline-0"
 			/>
 			<Kbd>esc</Kbd>
 		</div>
 		<div class="stw-scroll max-h-[360px] overflow-auto p-1.5">
 			{#if items.length === 0}
-				<div class="px-3.5 py-5 text-[13px] text-[var(--stw-fg-soft)]">
+				<div class="px-3.5 py-5 text-[13px] text-stw-fg-soft">
 					No results for "{q}"
 				</div>
 			{/if}
@@ -181,12 +181,12 @@
 						onclose();
 					}}
 					onmousemove={() => (idx = i)}
-					class="flex h-[34px] w-full cursor-pointer items-center gap-2.5 rounded-md border-0 px-2.5 text-left text-[13px] text-[var(--stw-fg)] {i ===
+					class="flex h-[34px] w-full cursor-pointer items-center gap-2.5 rounded-md border-0 px-2.5 text-left text-[13px] text-stw-fg {i ===
 					idx
-						? 'bg-[var(--stw-bg-hover)]'
+						? 'bg-stw-bg-hover'
 						: 'bg-transparent'}"
 				>
-					<span class="inline-flex text-[var(--stw-fg-mute)]">
+					<span class="inline-flex text-stw-fg-mute">
 						{#if it.icon === 'database'}<Database size={14} strokeWidth={1.7} />{/if}
 						{#if it.icon === 'link'}<LinkIcon size={14} strokeWidth={1.7} />{/if}
 						{#if it.icon === 'users'}<Users size={14} strokeWidth={1.7} />{/if}
@@ -199,17 +199,13 @@
 						{/if}
 					</span>
 					<span class="flex-1 truncate">{it.label}</span>
-					<span
-						class="text-[10.5px] font-medium tracking-[0.05em] text-[var(--stw-fg-soft)] uppercase"
-					>
+					<span class="text-[10.5px] font-medium tracking-[0.05em] text-stw-fg-soft uppercase">
 						{it.kind}
 					</span>
 				</button>
 			{/each}
 		</div>
-		<div
-			class="flex gap-3 border-t border-[var(--stw-border)] px-3.5 py-2 text-[11px] text-[var(--stw-fg-soft)]"
-		>
+		<div class="flex gap-3 border-t border-stw-border px-3.5 py-2 text-[11px] text-stw-fg-soft">
 			<span><Kbd>↑</Kbd> <Kbd>↓</Kbd> navigate</span>
 			<span><Kbd>↵</Kbd> select</span>
 			<span><Kbd>esc</Kbd> close</span>

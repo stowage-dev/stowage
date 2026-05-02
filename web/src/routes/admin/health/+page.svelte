@@ -30,7 +30,7 @@
 	}
 </script>
 
-<div class="stw-page-pad mx-auto flex max-w-[1100px] flex-col gap-[18px]">
+<div class="mx-auto flex max-w-[1100px] flex-col gap-[18px] stw-page-pad">
 	<PageHeader
 		title="Backend health"
 		subtitle="Last 20 probe results per backend. Probe = a quick ListBuckets call against each backend on a 60-second cadence."
@@ -55,22 +55,22 @@
 			<SectionCard>
 				{#snippet header()}
 					<header
-						class="flex flex-wrap items-center gap-2.5 border-b border-[var(--stw-border)] px-[18px] py-3.5"
+						class="flex flex-wrap items-center gap-2.5 border-b border-stw-border px-[18px] py-3.5"
 					>
 						{#if bk.healthy}
-							<span class="inline-flex text-[var(--stw-ok)]">
+							<span class="inline-flex text-stw-ok">
 								<CircleCheck size={16} strokeWidth={1.7} />
 							</span>
 						{:else}
-							<span class="inline-flex text-[var(--stw-err)]">
+							<span class="inline-flex text-stw-err">
 								<CircleAlert size={16} strokeWidth={1.7} />
 							</span>
 						{/if}
 						<div class="min-w-0 flex-1">
 							<div class="text-[14px] font-semibold">{bk.name}</div>
-							<div class="font-mono text-[11.5px] text-[var(--stw-fg-soft)]">{bk.id}</div>
+							<div class="font-mono text-[11.5px] text-stw-fg-soft">{bk.id}</div>
 						</div>
-						<div class="text-right font-mono text-[12px] text-[var(--stw-fg-mute)]">
+						<div class="text-right font-mono text-[12px] text-stw-fg-mute">
 							<div>last probe {fmtTime(bk.last_probe_at)}</div>
 							<div>{bk.latency_ms}ms</div>
 						</div>
@@ -80,8 +80,7 @@
 				<div class="flex flex-col gap-3">
 					{#if bk.last_error}
 						<div
-							class="truncate rounded-md border px-3 py-2 font-mono text-[11.5px]"
-							style="background:color-mix(in oklch, var(--stw-err) 8%, var(--stw-bg-panel));border-color:color-mix(in oklch, var(--stw-err) 30%, var(--stw-border));color:var(--stw-err);"
+							class="truncate rounded-md border stw-metric-err px-3 py-2 font-mono text-[11.5px]"
 							title={bk.last_error}
 						>
 							{bk.last_error}
@@ -89,23 +88,19 @@
 					{/if}
 
 					<div
-						class="grid gap-[3px]"
+						class="grid grid-cols-[repeat(20,1fr)] gap-[3px]"
 						role="img"
 						aria-label="Recent probe history"
-						style="grid-template-columns:repeat(20,1fr);"
 					>
 						{#each bk.history as p, i (i)}
 							<div
-								class="h-[22px] rounded-[3px]"
-								style="background:color-mix(in oklch, {p.healthy
-									? 'var(--stw-ok)'
-									: 'var(--stw-err)'} 60%, var(--stw-bg-panel));"
+								class="h-[22px] rounded-[3px] {p.healthy ? 'stw-health-ok' : 'stw-health-err'}"
 								title="{fmtTime(p.at)} · {p.latency_ms}ms{p.error ? ' · ' + p.error : ''}"
 							></div>
 						{/each}
 						{#each Array(Math.max(0, 20 - bk.history.length)) as _, i (i)}
 							<div
-								class="h-[22px] rounded-[3px] border border-dashed border-[var(--stw-border)] bg-[var(--stw-bg-sunken)]"
+								class="h-[22px] rounded-[3px] border border-dashed border-stw-border bg-stw-bg-sunken"
 							></div>
 						{/each}
 					</div>

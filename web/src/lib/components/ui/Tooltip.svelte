@@ -41,7 +41,7 @@
 
 <span
 	bind:this={triggerEl}
-	style="display:inline-flex;"
+	class="inline-flex"
 	onmouseenter={() => (show = true)}
 	onmouseleave={() => (show = false)}
 	role="presentation"
@@ -52,9 +52,10 @@
 	<span
 		bind:this={tooltipEl}
 		role="tooltip"
-		style="position:fixed;top:{top}px;left:{left}px;padding:5px 8px;white-space:nowrap;background:var(--stw-n-800);color:var(--stw-n-0);font-size:11px;border-radius:5px;box-shadow:var(--stw-shadow-md);pointer-events:none;z-index:1000;opacity:{measured
-			? 1
-			: 0};"
+		class="pointer-events-none fixed z-[1000] rounded-[5px] bg-stw-n-800 px-2 py-[5px] text-[11px] whitespace-nowrap text-stw-n-0 shadow-stw-md {measured
+			? 'opacity-100'
+			: 'opacity-0'}"
+		style="top:{top}px;left:{left}px;"
 	>
 		{text}
 	</span>

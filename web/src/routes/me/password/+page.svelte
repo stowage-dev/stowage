@@ -44,7 +44,7 @@
 	<title>Change password · stowage</title>
 </svelte:head>
 
-<div class="stw-page-pad max-w-[520px]">
+<div class="max-w-[520px] stw-page-pad">
 	<PageHeader
 		title="Change password"
 		subtitle={session.me ? `Signed in as ${session.me.username}.` : undefined}

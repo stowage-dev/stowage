@@ -139,7 +139,7 @@
 	});
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader
 		title="My S3 credentials"
 		subtitle="Personal virtual access keys for the embedded S3 proxy"
@@ -183,28 +183,27 @@
 			{#snippet row(c)}
 				{@const exp = expiresLabel(c.expires_at)}
 				<td class="px-3 font-mono text-[12.5px]">{c.access_key}</td>
-				<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">{c.backend_id}</td>
+				<td class="px-3 font-mono text-[12px] text-stw-fg-mute">{c.backend_id}</td>
 				<td class="px-3">
 					<div class="flex max-w-[260px] flex-wrap gap-1">
 						{#each c.buckets.slice(0, 3) as b (b)}
 							<span
-								class="rounded bg-[var(--stw-bg-hover)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
+								class="rounded bg-stw-bg-hover px-1.5 py-0.5 font-mono text-[11px] text-stw-fg-mute"
 								>{b}</span
 							>
 						{/each}
 						{#if c.buckets.length > 3}
-							<span class="text-[11px] text-[var(--stw-fg-soft)]">+{c.buckets.length - 3} more</span
-							>
+							<span class="text-[11px] text-stw-fg-soft">+{c.buckets.length - 3} more</span>
 						{/if}
 					</div>
 				</td>
-				<td class="px-3 text-[12px] text-[var(--stw-fg-mute)]">{c.description ?? '—'}</td>
+				<td class="px-3 text-[12px] text-stw-fg-mute">{c.description ?? '—'}</td>
 				<td
 					class="px-3 text-right font-mono text-[11.5px] {exp.tone === 'warn'
-						? 'text-[var(--stw-warn)]'
+						? 'text-stw-warn'
 						: exp.tone === 'soft'
-							? 'text-[var(--stw-fg-soft)]'
-							: 'text-[var(--stw-fg-mute)]'}"
+							? 'text-stw-fg-soft'
+							: 'text-stw-fg-mute'}"
 				>
 					{exp.text}
 				</td>

@@ -22,9 +22,9 @@
 	}: Props = $props();
 </script>
 
-<div class="card">
+<div class="lg-card">
 	{#if showBack}
-		<a class="back-btn" href={backHref} aria-label="Back to sign in">
+		<a class="lg-back-btn" href={backHref} aria-label="Back to sign in">
 			<svg
 				width="14"
 				height="14"
@@ -41,14 +41,14 @@
 		</a>
 	{/if}
 
-	<div class="brand-row">
-		<div class="brand-mark">s</div>
-		<div class="brand-name">stowage</div>
-		<div class="brand-meta"><span class="dot"></span>self-hosted</div>
+	<div class="lg-brand-row">
+		<div class="lg-brand-mark">s</div>
+		<div class="lg-brand-name">stowage</div>
+		<div class="lg-brand-meta"><span class="lg-brand-meta-dot"></span>self-hosted</div>
 	</div>
 
-	<h1 class="title">{title}</h1>
-	{#if sub}<p class="sub">{sub}</p>{/if}
+	<h1 class="lg-title">{title}</h1>
+	{#if sub}<p class="lg-sub">{sub}</p>{/if}
 
 	{@render children()}
 

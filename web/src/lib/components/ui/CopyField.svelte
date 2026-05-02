@@ -31,7 +31,7 @@
 </script>
 
 <div
-	class="flex items-center gap-2 overflow-hidden rounded-md border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] {padCls} {textCls} {mono
+	class="flex items-center gap-2 overflow-hidden rounded-md border border-stw-border bg-stw-bg-sunken {padCls} {textCls} {mono
 		? 'font-mono'
 		: ''}"
 >
@@ -41,9 +41,9 @@
 	<button
 		type="button"
 		onclick={copy}
-		class="stw-focus inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded border border-[var(--stw-border)] bg-transparent px-2 py-0.5 text-[11.5px] {copied
-			? 'text-[var(--stw-ok)]'
-			: 'text-[var(--stw-fg-mute)]'} hover:bg-[var(--stw-bg-hover)] hover:text-[var(--stw-fg)]"
+		class="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 rounded border border-stw-border bg-transparent px-2 py-0.5 text-[11.5px] focus-ring {copied
+			? 'text-stw-ok'
+			: 'text-stw-fg-mute'} hover:bg-stw-bg-hover hover:text-stw-fg"
 		aria-label={ariaLabel ?? label}
 	>
 		{#if copied}

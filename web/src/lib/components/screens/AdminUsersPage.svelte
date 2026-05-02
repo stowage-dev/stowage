@@ -107,7 +107,7 @@
 	});
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader title="Users">
 		{#snippet meta()}
 			<StatLine
@@ -149,23 +149,20 @@
 				<span class="inline-flex items-center gap-2">
 					<span
 						aria-hidden="true"
-						class="inline-flex h-[22px] w-[22px] items-center justify-center rounded bg-[var(--stw-bg-hover)] text-[10.5px] font-semibold text-[var(--stw-fg-mute)]"
+						class="inline-flex h-[22px] w-[22px] items-center justify-center rounded bg-stw-bg-hover text-[10.5px] font-semibold text-stw-fg-mute"
 					>
 						{u.username.slice(0, 2).toUpperCase()}
 					</span>
 					<span class="font-medium">{u.username}</span>
 					{#if u.id === meId}
-						<span class="text-[10.5px] text-[var(--stw-fg-soft)]">(you)</span>
+						<span class="text-[10.5px] text-stw-fg-soft">(you)</span>
 					{/if}
 				</span>
 			</td>
-			<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">{u.email ?? '—'}</td>
+			<td class="px-3 font-mono text-[12px] text-stw-fg-mute">{u.email ?? '—'}</td>
 			<td class="px-3">
 				{#if src.type === 'oidc'}
-					<Badge
-						mono
-						style="color:var(--stw-accent-700);background:var(--stw-accent-50);border-color:color-mix(in oklch, var(--stw-accent-500) 30%, transparent);"
-					>
+					<Badge mono class="stw-role-admin">
 						oidc:{src.issuer}
 					</Badge>
 				{:else if src.type === 'static'}
@@ -183,12 +180,12 @@
 						<Lock size={10} strokeWidth={1.7} /> locked
 					</Badge>
 				{:else if u.enabled}
-					<span class="text-[11.5px] text-[var(--stw-fg-mute)]">enabled</span>
+					<span class="text-[11.5px] text-stw-fg-mute">enabled</span>
 				{:else}
 					<Badge>disabled</Badge>
 				{/if}
 			</td>
-			<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">
+			<td class="px-3 font-mono text-[12px] text-stw-fg-mute">
 				{new Date(u.created_at).toLocaleDateString()}
 			</td>
 			<td class="px-3 text-right">

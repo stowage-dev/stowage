@@ -1,18 +1,281 @@
+/* Copyright (C) 2026 Damian van der Merwe */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
 @import 'tailwindcss';
-@import './lib/styles/stowage.css' layer(components);
 
-html,
-body {
-	height: 100%;
-	margin: 0;
+/* Dark mode keyed off [data-theme='dark'] on <html> (set synchronously in app.html). */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ──────────────────────────────────────────────────────────────────────
+   Semantic design tokens. Two palettes coexist:
+   • --stw-*  cool slate + blue accent (page chrome, primitives, content)
+   • --warm-* warm neutral + terracotta (sidebar, auth surface)
+   Tokens switch with [data-theme='dark'] so all `bg-stw-bg`/`text-warm-fg`
+   utilities (registered via @theme inline below) flip automatically.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+	/* stw — Neutrals (zinc-leaning slate, 12-step ramp) */
+	--stw-n-0: #ffffff;
+	--stw-n-25: #fafafa;
+	--stw-n-50: #f6f6f7;
+	--stw-n-100: #eeeef0;
+	--stw-n-150: #e4e4e7;
+	--stw-n-200: #d4d4d8;
+	--stw-n-300: #a1a1aa;
+	--stw-n-400: #71717a;
+	--stw-n-500: #52525b;
+	--stw-n-600: #3f3f46;
+	--stw-n-700: #27272a;
+	--stw-n-800: #1c1c1f;
+	--stw-n-900: #121214;
+	--stw-n-950: #09090b;
+
+	/* stw — Accent (blue 500/600) */
+	--stw-accent-50: #eff6ff;
+	--stw-accent-100: #dbeafe;
+	--stw-accent-500: #3b82f6;
+	--stw-accent-600: #2563eb;
+	--stw-accent-700: #1d4ed8;
+
+	/* stw — Semantic state */
+	--stw-ok: #10b981;
+	--stw-warn: #f59e0b;
+	--stw-err: #ef4444;
+	--stw-muted: var(--stw-n-300);
+
+	/* stw — Surfaces */
+	--stw-bg: var(--stw-n-25);
+	--stw-bg-panel: var(--stw-n-0);
+	--stw-bg-sunken: var(--stw-n-50);
+	--stw-bg-hover: var(--stw-n-100);
+	--stw-bg-sel: var(--stw-accent-50);
+
+	/* stw — Borders */
+	--stw-border: var(--stw-n-150);
+	--stw-border-strong: var(--stw-n-200);
+	--stw-border-focus: var(--stw-accent-500);
+
+	/* stw — Text */
+	--stw-fg: var(--stw-n-900);
+	--stw-fg-mute: var(--stw-n-500);
+	--stw-fg-soft: var(--stw-n-400);
+	--stw-fg-inv: var(--stw-n-0);
+
+	/* Typography — system stacks, no web fonts */
+	--stw-font-ui:
+		-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, 'Helvetica Neue', Arial,
+		sans-serif;
+	--stw-font-mono:
+		ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+	/* Radii */
+	--stw-r-sm: 4px;
+	--stw-r-md: 6px;
+	--stw-r-lg: 8px;
+	--stw-r-xl: 12px;
+
+	/* Shadows — subtle, one direction */
+	--stw-shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.04);
+	--stw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+	--stw-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+	--stw-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+
+	/* Motion */
+	--stw-dur: 120ms;
+	--stw-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+	/* warm — sidebar + auth palette */
+	--warm-bg: #ffffff;
+	--warm-bg-soft: #fafaf9;
+	--warm-bg-hover: #f4f4f3;
+	--warm-bg-active: #f0efed;
+	--warm-canvas: #f4f2ed;
+	--warm-border: #e7e5e0;
+	--warm-border-strong: #d9d6cf;
+	--warm-fg: #1c1b1a;
+	--warm-fg-muted: #6b6862;
+	--warm-fg-faint: #9a958c;
+	--warm-accent: #c96442;
+	--warm-accent-hover: #b9583a;
+	--warm-accent-soft: rgba(201, 100, 66, 0.1);
+	--warm-ok: #4a8f5a;
+	--warm-warn: #c4923a;
+	--warm-err: #c0524a;
+	--warm-err-soft: rgba(192, 82, 74, 0.08);
+	--warm-shadow-card: 0 1px 0 rgba(0, 0, 0, 0.02), 0 12px 32px -16px rgba(20, 15, 10, 0.08);
 }
 
-body {
-	font-family: var(--stw-font-ui);
-	background: var(--stw-bg);
-	color: var(--stw-fg);
+:root[data-theme='dark'] {
+	/* stw — dark overrides */
+	--stw-n-0: #0b0b0d;
+	--stw-n-25: #111114;
+	--stw-n-50: #16161a;
+	--stw-n-100: #1d1d22;
+	--stw-n-150: #25252b;
+	--stw-n-200: #2e2e35;
+	--stw-n-300: #3f3f47;
+	--stw-n-400: #5b5b66;
+	--stw-n-500: #7d7d88;
+	--stw-n-600: #9a9aa4;
+	--stw-n-700: #b4b4bc;
+	--stw-n-800: #d1d1d7;
+	--stw-n-900: #e8e8eb;
+	--stw-n-950: #f5f5f7;
+
+	--stw-accent-50: #111a2e;
+	--stw-accent-100: #172554;
+
+	--stw-bg: var(--stw-n-25);
+	--stw-bg-panel: var(--stw-n-50);
+	--stw-bg-sunken: var(--stw-n-0);
+	--stw-bg-hover: var(--stw-n-100);
+	--stw-bg-sel: var(--stw-accent-50);
+
+	--stw-border: var(--stw-n-150);
+	--stw-border-strong: var(--stw-n-200);
+
+	--stw-fg: var(--stw-n-900);
+	--stw-fg-mute: var(--stw-n-600);
+	--stw-fg-soft: var(--stw-n-500);
+
+	--stw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+	--stw-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+	--stw-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+	/* warm — dark overrides */
+	--warm-bg: #131313;
+	--warm-bg-soft: #181817;
+	--warm-bg-hover: #1f1f1e;
+	--warm-bg-active: #262624;
+	--warm-canvas: #0d0d0c;
+	--warm-border: #262624;
+	--warm-border-strong: #34332f;
+	--warm-fg: #ececea;
+	--warm-fg-muted: #8b8780;
+	--warm-fg-faint: #5d5a55;
+	--warm-accent: #e08267;
+	--warm-accent-hover: #ec9078;
+	--warm-accent-soft: rgba(224, 130, 103, 0.14);
+	--warm-ok: #6fb27e;
+	--warm-warn: #d6a85c;
+	--warm-err: #d77468;
+	--warm-err-soft: rgba(215, 106, 98, 0.1);
+	--warm-shadow-card: 0 1px 0 rgba(0, 0, 0, 0.5), 0 24px 48px -16px rgba(0, 0, 0, 0.5);
 }
 
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--stw-dur: 0ms;
+	}
+}
+
+/* Register tokens as Tailwind utilities. `inline` keeps `var(...)` in the
+   emitted CSS so theme switching at runtime works. */
+@theme inline {
+	/* stw colours */
+	--color-stw-n-0: var(--stw-n-0);
+	--color-stw-n-25: var(--stw-n-25);
+	--color-stw-n-50: var(--stw-n-50);
+	--color-stw-n-100: var(--stw-n-100);
+	--color-stw-n-150: var(--stw-n-150);
+	--color-stw-n-200: var(--stw-n-200);
+	--color-stw-n-300: var(--stw-n-300);
+	--color-stw-n-400: var(--stw-n-400);
+	--color-stw-n-500: var(--stw-n-500);
+	--color-stw-n-600: var(--stw-n-600);
+	--color-stw-n-700: var(--stw-n-700);
+	--color-stw-n-800: var(--stw-n-800);
+	--color-stw-n-900: var(--stw-n-900);
+	--color-stw-n-950: var(--stw-n-950);
+
+	--color-stw-accent-50: var(--stw-accent-50);
+	--color-stw-accent-100: var(--stw-accent-100);
+	--color-stw-accent-500: var(--stw-accent-500);
+	--color-stw-accent-600: var(--stw-accent-600);
+	--color-stw-accent-700: var(--stw-accent-700);
+
+	--color-stw-ok: var(--stw-ok);
+	--color-stw-warn: var(--stw-warn);
+	--color-stw-err: var(--stw-err);
+	--color-stw-muted: var(--stw-muted);
+
+	--color-stw-bg: var(--stw-bg);
+	--color-stw-bg-panel: var(--stw-bg-panel);
+	--color-stw-bg-sunken: var(--stw-bg-sunken);
+	--color-stw-bg-hover: var(--stw-bg-hover);
+	--color-stw-bg-sel: var(--stw-bg-sel);
+
+	--color-stw-border: var(--stw-border);
+	--color-stw-border-strong: var(--stw-border-strong);
+	--color-stw-border-focus: var(--stw-border-focus);
+
+	--color-stw-fg: var(--stw-fg);
+	--color-stw-fg-mute: var(--stw-fg-mute);
+	--color-stw-fg-soft: var(--stw-fg-soft);
+	--color-stw-fg-inv: var(--stw-fg-inv);
+
+	/* warm palette */
+	--color-warm-bg: var(--warm-bg);
+	--color-warm-bg-soft: var(--warm-bg-soft);
+	--color-warm-bg-hover: var(--warm-bg-hover);
+	--color-warm-bg-active: var(--warm-bg-active);
+	--color-warm-canvas: var(--warm-canvas);
+	--color-warm-border: var(--warm-border);
+	--color-warm-border-strong: var(--warm-border-strong);
+	--color-warm-fg: var(--warm-fg);
+	--color-warm-fg-muted: var(--warm-fg-muted);
+	--color-warm-fg-faint: var(--warm-fg-faint);
+	--color-warm-accent: var(--warm-accent);
+	--color-warm-accent-hover: var(--warm-accent-hover);
+	--color-warm-accent-soft: var(--warm-accent-soft);
+	--color-warm-ok: var(--warm-ok);
+	--color-warm-warn: var(--warm-warn);
+	--color-warm-err: var(--warm-err);
+	--color-warm-err-soft: var(--warm-err-soft);
+
+	/* shadows */
+	--shadow-stw-xs: var(--stw-shadow-xs);
+	--shadow-stw-sm: var(--stw-shadow-sm);
+	--shadow-stw-md: var(--stw-shadow-md);
+	--shadow-stw-lg: var(--stw-shadow-lg);
+	--shadow-warm-card: var(--warm-shadow-card);
+
+	/* radii */
+	--radius-stw-sm: var(--stw-r-sm);
+	--radius-stw-md: var(--stw-r-md);
+	--radius-stw-lg: var(--stw-r-lg);
+	--radius-stw-xl: var(--stw-r-xl);
+
+	/* fonts */
+	--font-stw-ui: var(--stw-font-ui);
+	--font-stw-mono: var(--stw-font-mono);
+	--default-font-family: var(--stw-font-ui);
+
+	/* animations */
+	--animate-stw-pulse: stw-pulse 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	--animate-stw-spin: stw-spin 800ms linear infinite;
+	--animate-lg-spin: lg-spin 0.7s linear infinite;
+}
+
+@keyframes stw-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.55;
+	}
+}
+@keyframes stw-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@keyframes lg-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
 @keyframes stw-fade-in {
 	from {
 		opacity: 0;
@@ -41,60 +304,691 @@ body {
 		opacity: 1;
 	}
 }
-@keyframes stw-toast-in {
-	from {
-		transform: translate(-50%, 8px);
-		opacity: 0;
+
+/* ──────────────────────────────────────────────────────────────────────
+   Custom Tailwind utilities. Every project-specific styling pattern lives
+   here as a single `@utility name` block consumable as `class="name"` in
+   markup — no component-scoped <style> blocks, no global CSS rules.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Universal focus ring (was .stw-focus). */
+@utility focus-ring {
+	&:focus-visible {
+		outline: none;
+		box-shadow:
+			0 0 0 2px var(--stw-bg-panel),
+			0 0 0 4px var(--stw-accent-500);
 	}
-	to {
-		transform: translate(-50%, 0);
+}
+
+/* Buttons */
+@utility stw-btn {
+	@apply inline-flex h-7 cursor-pointer items-center gap-2 rounded-stw-md border border-stw-border bg-stw-bg-panel px-2.5 text-[13px] font-medium text-stw-fg focus-ring transition-colors duration-[120ms] hover:bg-stw-bg-hover;
+}
+@utility stw-btn--primary {
+	@apply border-stw-accent-600 bg-stw-accent-600 text-stw-fg-inv hover:border-stw-accent-700 hover:bg-stw-accent-700;
+}
+@utility stw-btn--ghost {
+	@apply border-transparent bg-transparent hover:bg-stw-bg-hover;
+}
+@utility stw-btn--danger {
+	@apply border-stw-err bg-stw-err text-stw-fg-inv hover:brightness-90;
+}
+@utility stw-btn--sm {
+	@apply h-6 px-2 text-[11px];
+}
+@utility stw-btn--lg {
+	@apply h-9 px-3.5 text-[14px];
+}
+
+/* Inputs */
+@utility stw-input {
+	@apply block h-8 w-full rounded-stw-md border border-stw-border bg-stw-bg-panel px-2.5 text-[14px] leading-none text-stw-fg transition-[border-color,box-shadow] duration-[120ms] placeholder:text-stw-fg-soft focus:border-stw-border-focus focus:outline-none;
+	&:focus {
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--stw-accent-500) 20%, transparent);
+	}
+}
+
+/* Chips (filter pills, expiry presets) */
+@utility stw-chip {
+	@apply inline-flex h-[26px] cursor-pointer items-center gap-1.5 rounded-full border border-stw-border bg-stw-bg-sunken px-2.5 text-[11px] font-medium text-stw-fg-mute transition-colors duration-[120ms] hover:bg-stw-bg-hover hover:text-stw-fg;
+	&[aria-pressed='true'] {
+		color: var(--stw-accent-700);
+		background: var(--stw-accent-50);
+		border-color: color-mix(in oklch, var(--stw-accent-500) 30%, var(--stw-border));
+	}
+}
+
+/* Badges */
+@utility stw-badge {
+	@apply inline-flex h-[18px] items-center gap-1 rounded-stw-sm border border-stw-border bg-stw-bg-sunken px-1.5 font-stw-mono text-[10.5px] tracking-[0.02em] text-stw-fg-mute;
+}
+@utility stw-badge--ok {
+	color: color-mix(in oklch, var(--stw-ok) 70%, var(--stw-fg));
+	background: color-mix(in oklch, var(--stw-ok) 10%, transparent);
+	border-color: color-mix(in oklch, var(--stw-ok) 25%, transparent);
+}
+@utility stw-badge--warn {
+	color: color-mix(in oklch, var(--stw-warn) 80%, var(--stw-fg));
+	background: color-mix(in oklch, var(--stw-warn) 12%, transparent);
+	border-color: color-mix(in oklch, var(--stw-warn) 30%, transparent);
+}
+@utility stw-badge--err {
+	color: color-mix(in oklch, var(--stw-err) 80%, var(--stw-fg));
+	background: color-mix(in oklch, var(--stw-err) 10%, transparent);
+	border-color: color-mix(in oklch, var(--stw-err) 25%, transparent);
+}
+
+/* Health dot */
+@utility stw-dot {
+	@apply inline-block h-2 w-2 shrink-0 rounded-full;
+}
+@utility stw-dot--ok {
+	background: var(--stw-ok);
+}
+@utility stw-dot--warn {
+	background: var(--stw-warn);
+}
+@utility stw-dot--err {
+	background: var(--stw-err);
+}
+@utility stw-dot--muted {
+	background: var(--stw-muted);
+}
+
+/* Keyboard hint */
+@utility stw-kbd {
+	@apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-stw-sm border border-b-2 border-stw-border bg-stw-bg-panel px-[5px] font-stw-mono text-[10.5px] font-medium text-stw-fg-mute;
+}
+
+/* Skeleton loader */
+@utility stw-skeleton {
+	@apply animate-stw-pulse rounded-stw-sm bg-stw-bg-hover;
+}
+
+/* Mono text */
+@utility stw-mono {
+	@apply font-stw-mono text-[12px];
+}
+
+/* Custom scrollbar */
+@utility stw-scroll {
+	scrollbar-width: thin;
+	scrollbar-color: var(--stw-n-200) transparent;
+	&::-webkit-scrollbar {
+		width: 10px;
+		height: 10px;
+	}
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--stw-n-200);
+		border-radius: 999px;
+		border: 3px solid transparent;
+		background-clip: content-box;
+	}
+	&::-webkit-scrollbar-thumb:hover {
+		background: var(--stw-n-300);
+		background-clip: content-box;
+		border: 3px solid transparent;
+	}
+}
+
+/* Custom checkbox: paint check / indeterminate marks via pseudo-elements. */
+@utility stw-check {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 15px;
+	height: 15px;
+	margin: 0;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--stw-bg-panel);
+	border: 1.5px solid var(--stw-border-strong);
+	border-radius: 4px;
+	cursor: pointer;
+	vertical-align: middle;
+	flex-shrink: 0;
+	transition:
+		background 120ms,
+		border-color 120ms,
+		box-shadow 120ms;
+	&:hover {
+		border-color: var(--stw-accent-500);
+	}
+	&:checked,
+	&:indeterminate {
+		background: var(--stw-accent-600);
+		border-color: var(--stw-accent-600);
+	}
+	&:checked::after {
+		content: '';
+		width: 7px;
+		height: 3.5px;
+		border: solid #fff;
+		border-width: 0 0 2px 2px;
+		transform: rotate(-45deg) translate(0px, -1px);
+	}
+	&:indeterminate::after {
+		content: '';
+		width: 8px;
+		height: 2px;
+		background: #fff;
+		border-radius: 1px;
+	}
+	&:focus-visible {
+		outline: none;
+		box-shadow:
+			0 0 0 2px var(--stw-bg-panel),
+			0 0 0 4px var(--stw-accent-500);
+	}
+}
+
+/* Banner variants — colour-mixed surfaces against the panel background. */
+@utility stw-banner-info {
+	background: color-mix(in oklch, var(--stw-accent-500) 10%, var(--stw-bg-panel));
+	border-color: color-mix(in oklch, var(--stw-accent-500) 35%, var(--stw-border));
+	color: var(--stw-fg);
+}
+@utility stw-banner-ok {
+	background: color-mix(in oklch, var(--stw-ok) 10%, var(--stw-bg-panel));
+	border-color: color-mix(in oklch, var(--stw-ok) 35%, var(--stw-border));
+	color: var(--stw-ok);
+}
+@utility stw-banner-warn {
+	background: color-mix(in oklch, var(--stw-warn) 10%, var(--stw-bg-panel));
+	border-color: color-mix(in oklch, var(--stw-warn) 35%, var(--stw-border));
+	color: var(--stw-warn);
+}
+@utility stw-banner-err {
+	background: color-mix(in oklch, var(--stw-err) 10%, var(--stw-bg-panel));
+	border-color: color-mix(in oklch, var(--stw-err) 35%, var(--stw-border));
+	color: var(--stw-err);
+}
+
+/* Static-mode banner (TopBar). */
+@utility stw-static-banner {
+	background: color-mix(in oklch, var(--stw-warn) 12%, var(--stw-bg-panel));
+	border-bottom: 1px solid color-mix(in oklch, var(--stw-warn) 35%, var(--stw-border));
+	color: color-mix(in oklch, var(--stw-warn) 75%, var(--stw-fg));
+}
+
+/* Inset bottom-divider shadow (table rows). */
+@utility row-divider {
+	box-shadow: inset 0 -1px 0 var(--stw-border);
+}
+
+/* DetailDrawer version chip backgrounds. */
+@utility stw-version-current {
+	background: color-mix(in oklch, var(--stw-accent-500) 18%, var(--stw-bg-panel));
+}
+@utility stw-version-deleted {
+	background: color-mix(in oklch, var(--stw-err) 15%, var(--stw-bg-panel));
+}
+
+/* BucketBrowser drag-target tint. */
+@utility stw-drag-tint {
+	background: color-mix(in oklch, var(--stw-accent-500) 14%, transparent);
+}
+
+/* AdminUsersPage admin-role badge. */
+@utility stw-role-admin {
+	color: var(--stw-accent-700);
+	background: var(--stw-accent-50);
+	border-color: color-mix(in oklch, var(--stw-accent-500) 30%, transparent);
+}
+
+/* Admin health-page total-error metric tint. */
+@utility stw-metric-err {
+	background: color-mix(in oklch, var(--stw-err) 8%, var(--stw-bg-panel));
+	border-color: color-mix(in oklch, var(--stw-err) 30%, var(--stw-border));
+	color: var(--stw-err);
+}
+
+/* Admin health bar — healthy / unhealthy 24h slot tints. */
+@utility stw-health-ok {
+	background: color-mix(in oklch, var(--stw-ok) 60%, var(--stw-bg-panel));
+}
+@utility stw-health-err {
+	background: color-mix(in oklch, var(--stw-err) 60%, var(--stw-bg-panel));
+}
+
+/* Page route placeholder ("Loading…") panel. */
+@utility stw-page-loading {
+	@apply p-10 text-[13px] text-stw-fg-soft;
+}
+
+/* Image transparency checkerboard (Preview.svelte image bg). */
+@utility bg-checker {
+	background:
+		linear-gradient(45deg, #00000010 25%, transparent 25%),
+		linear-gradient(-45deg, #00000010 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #00000010 75%),
+		linear-gradient(-45deg, transparent 75%, #00000010 75%);
+	background-size: 16px 16px;
+	background-position:
+		0 0,
+		0 8px,
+		8px -8px,
+		-8px 0;
+}
+
+/* Auth canvas dot texture (login / auth pages). */
+@utility bg-dot-grid {
+	background-image: radial-gradient(circle at 1px 1px, var(--warm-border) 1px, transparent 0);
+	background-size: 22px 22px;
+	mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+	opacity: 0.55;
+	&:where([data-theme='dark'] *, [data-theme='dark']) {
+		opacity: 0.4;
+	}
+}
+
+/* Auth-form inputs: defeat Chrome's autofill yellow/white wash. */
+@utility autofill-warm {
+	&:-webkit-autofill,
+	&:-webkit-autofill:hover,
+	&:-webkit-autofill:focus {
+		-webkit-text-fill-color: var(--warm-fg);
+		-webkit-box-shadow: 0 0 0 1000px var(--warm-bg-soft) inset;
+		caret-color: var(--warm-fg);
+		transition:
+			background-color 99999s 0s,
+			color 99999s 0s;
+	}
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Auth surface (login + AuthCard). Single namespace, dark via [data-theme].
+   ────────────────────────────────────────────────────────────────────── */
+
+@utility lg-canvas {
+	@apply relative flex min-h-screen w-full items-center justify-center bg-warm-canvas p-6 text-warm-fg;
+	font-family: var(--stw-font-ui);
+	-webkit-font-smoothing: antialiased;
+	font-size: 13.5px;
+}
+
+@utility lg-card {
+	@apply relative z-[1] w-[380px] max-w-full rounded-[12px] border border-warm-border bg-warm-bg p-7 shadow-warm-card;
+}
+
+@utility lg-stack {
+	@apply relative z-[1] flex w-[380px] max-w-full flex-col items-center;
+}
+
+@utility lg-brand-row {
+	@apply mb-[22px] flex items-center gap-2.5;
+}
+@utility lg-brand-mark {
+	@apply flex h-7 w-7 items-center justify-center rounded-md text-[14px] font-bold;
+	background: #1c1b1a;
+	color: #fff;
+	letter-spacing: -0.02em;
+	&:where([data-theme='dark'] *, [data-theme='dark']) {
+		background: #ececea;
+		color: #131313;
+	}
+}
+@utility lg-brand-name {
+	@apply text-[15px] font-semibold;
+	letter-spacing: -0.01em;
+}
+@utility lg-brand-meta {
+	@apply ml-auto font-stw-mono text-[10.5px] tracking-[0.02em] text-warm-fg-faint;
+}
+@utility lg-brand-meta-dot {
+	@apply mr-[5px] inline-block h-1.5 w-1.5 rounded-full bg-warm-ok align-[1px];
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--warm-ok) 18%, transparent);
+}
+
+@utility lg-title {
+	@apply m-0 mb-[5px] text-[20px] font-semibold;
+	letter-spacing: -0.015em;
+}
+@utility lg-sub {
+	@apply m-0 mb-5 text-[13px] leading-[1.4] text-warm-fg-muted;
+}
+
+@utility lg-field {
+	@apply relative mb-[14px] flex flex-col gap-1.5;
+}
+@utility lg-label {
+	@apply flex items-center justify-between text-[12px] font-medium text-warm-fg-muted;
+	letter-spacing: -0.005em;
+}
+@utility lg-helper {
+	@apply cursor-pointer text-[12px] text-warm-accent no-underline hover:underline;
+	font-weight: 450;
+}
+
+@utility lg-input {
+	@apply block h-[38px] w-full appearance-none rounded-lg border border-warm-border bg-warm-bg-soft px-3 text-[13.5px] text-warm-fg autofill-warm transition-[border-color,background-color,box-shadow] duration-[120ms] outline-none placeholder:text-warm-fg-faint hover:border-warm-border-strong focus:border-warm-accent focus:bg-warm-bg;
+	color-scheme: light dark;
+	&:focus {
+		box-shadow: 0 0 0 3px var(--warm-accent-soft);
+	}
+	&:where([data-theme='dark'] *, [data-theme='dark']) {
+		background-color: #181817;
+		color: #ececea;
+	}
+	&:where([data-theme='dark'] *, [data-theme='dark']):focus {
+		background-color: #131313;
+	}
+	&:where([data-theme='dark'] *, [data-theme='dark'])::placeholder {
+		color: #5d5a55;
+	}
+}
+@utility lg-input--with-prefix {
+	padding-left: 32px;
+}
+@utility lg-field-error {
+	& .lg-input {
+		border-color: var(--warm-err);
+		background-color: var(--warm-err-soft);
+	}
+	& .lg-input:focus {
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--warm-err) 18%, transparent);
+	}
+	&:where([data-theme='dark'] *, [data-theme='dark']) .lg-input {
+		background-color: rgba(215, 106, 98, 0.1);
+	}
+}
+
+@utility lg-prefix {
+	@apply pointer-events-none absolute top-[34px] left-[11px] inline-flex h-4 w-4 items-center justify-center text-warm-fg-faint;
+}
+@utility lg-suffix-btn {
+	@apply absolute top-8 right-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-warm-fg-faint hover:bg-warm-bg-hover hover:text-warm-fg;
+}
+
+@utility lg-err-text {
+	@apply mt-1.5 flex items-center gap-[5px] text-[11.5px] text-warm-err;
+}
+
+@utility lg-err-banner {
+	@apply mb-[14px] flex items-start gap-2 rounded-lg border border-warm-err bg-warm-err-soft px-3 py-2.5 text-[12.5px] leading-[1.4] text-warm-err;
+	border-color: color-mix(in srgb, var(--warm-err) 30%, transparent);
+	& svg {
+		flex: 0 0 auto;
+		margin-top: 1px;
+	}
+}
+
+@utility lg-warn-banner {
+	@apply relative z-[1] mb-4 flex w-[380px] max-w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[12.5px];
+	background: color-mix(in srgb, var(--warm-warn) 12%, var(--warm-bg));
+	border-color: color-mix(in srgb, var(--warm-warn) 35%, var(--warm-border));
+	color: color-mix(in srgb, var(--warm-warn) 70%, var(--warm-fg));
+}
+
+@utility lg-divider {
+	@apply my-[14px] flex items-center gap-2.5 text-[11px] tracking-[0.08em] text-warm-fg-faint uppercase;
+	&::before,
+	&::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--warm-border);
+	}
+}
+
+@utility lg-btn {
+	@apply inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent text-[13.5px] transition-[background,border-color,color,transform] duration-[120ms] active:translate-y-[0.5px];
+	font-weight: 550;
+	letter-spacing: -0.005em;
+}
+@utility lg-btn--primary {
+	@apply border-warm-accent bg-warm-accent text-white hover:border-warm-accent-hover hover:bg-warm-accent-hover;
+	&[disabled],
+	&.loading {
+		background-color: color-mix(in srgb, var(--warm-accent) 60%, var(--warm-bg-hover));
+		border-color: transparent;
+		cursor: progress;
+	}
+}
+@utility lg-btn--secondary {
+	@apply border-warm-border bg-warm-bg text-warm-fg hover:border-warm-border-strong hover:bg-warm-bg-hover;
+}
+@utility lg-link-btn {
+	@apply w-full cursor-pointer border-0 bg-transparent p-1.5 text-center text-[12.5px] text-warm-fg-muted hover:text-warm-fg;
+}
+@utility lg-back-btn {
+	@apply absolute -top-11 left-0 inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent pr-2.5 pl-[6px] text-[12.5px] text-warm-fg-muted transition-[background,color] duration-[120ms] hover:bg-warm-bg-hover hover:text-warm-fg;
+}
+
+@utility lg-spinner {
+	@apply inline-block h-3.5 w-3.5 animate-lg-spin rounded-full;
+	border: 2px solid rgba(255, 255, 255, 0.35);
+	border-top-color: #fff;
+}
+
+@utility lg-signup {
+	@apply mt-[22px] border-t border-warm-border pt-4 text-center text-[12.5px] text-warm-fg-muted;
+	& a {
+		@apply text-warm-accent no-underline hover:underline;
+		font-weight: 500;
+	}
+}
+@utility lg-legal {
+	@apply mt-[18px] text-center text-[11px] leading-[1.5] text-warm-fg-faint;
+	& a {
+		@apply text-warm-fg-muted no-underline hover:text-warm-fg hover:underline;
+	}
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Sidebar surface — same warm palette as auth.
+   ────────────────────────────────────────────────────────────────────── */
+
+@utility sb-sidebar {
+	@apply flex h-full w-[248px] shrink-0 flex-col bg-warm-bg text-[13px] text-warm-fg;
+	box-shadow: inset -1px 0 0 var(--warm-border);
+	-webkit-font-smoothing: antialiased;
+}
+@utility sb-head {
+	@apply flex items-center justify-between border-b border-warm-border px-3.5 pt-3.5 pb-3;
+}
+@utility sb-brand {
+	@apply flex items-center gap-[9px];
+}
+@utility sb-brand-logo {
+	@apply inline-flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[12px] font-bold;
+	font-family: var(--stw-font-mono);
+	letter-spacing: -0.02em;
+	background: #1c1b1a;
+	color: #fff;
+	&:where([data-theme='dark'] *, [data-theme='dark']) {
+		background: #ececea;
+		color: #131313;
+	}
+}
+@utility sb-brand-name {
+	@apply text-[13.5px] font-semibold;
+	letter-spacing: -0.01em;
+}
+@utility sb-body {
+	@apply flex flex-1 flex-col overflow-y-auto px-2 pt-1.5 pb-2;
+}
+@utility sb-row {
+	@apply flex h-[30px] w-full cursor-pointer items-center gap-[9px] rounded-md border-0 bg-transparent px-2 text-left text-warm-fg transition-colors duration-[120ms];
+	font-weight: 450;
+	letter-spacing: -0.005em;
+	&:hover:not(.active) {
+		background: var(--warm-bg-hover);
+	}
+	&.active {
+		background: var(--warm-bg-active);
+	}
+}
+@utility sb-row-ico {
+	@apply inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center text-warm-fg-muted;
+	.sb-row.active & {
+		color: var(--warm-fg);
+	}
+}
+@utility sb-row-label {
+	@apply min-w-0 flex-1 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap;
+	.sb-row.active & {
+		font-weight: 550;
+	}
+}
+@utility sb-pinned-ico {
+	color: var(--warm-accent);
+}
+@utility sb-sec {
+	@apply flex w-full cursor-pointer items-center justify-between border-0 bg-transparent px-2 pt-3.5 pb-1 text-left;
+	color: inherit;
+}
+@utility sb-sec-left {
+	@apply flex items-center gap-1;
+}
+@utility sb-sec-chev {
+	@apply h-3 w-3 transition-transform duration-150 ease-out;
+	color: var(--warm-fg-faint);
+	transform: rotate(90deg);
+	.sb-sec.collapsed & {
+		transform: rotate(0deg);
+	}
+}
+@utility sb-sec-title {
+	@apply text-[11px] font-semibold tracking-[0.02em] text-warm-fg-muted;
+}
+@utility sb-sec-body {
+	@apply ml-3.5 flex flex-col gap-px border-l border-warm-border pt-0.5 pl-2.5;
+}
+@utility sb-empty {
+	@apply px-2 py-1.5 text-[12px] text-warm-fg-faint;
+	&.nested {
+		padding-left: 14px;
+	}
+}
+@utility sb-error {
+	@apply px-2 py-1.5 text-[12px] break-words text-warm-err;
+	font-family: var(--stw-font-mono);
+	&.nested {
+		padding-left: 14px;
+	}
+	&.clickable {
+		cursor: pointer;
+	}
+	&.clickable:hover {
+		background: var(--warm-bg-hover);
+		border-radius: 4px;
+	}
+}
+@utility sb-tree-toggle {
+	@apply inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-150 ease-out;
+	color: var(--warm-fg-faint);
+	transform: rotate(90deg);
+	.sb-tree-row.collapsed & {
+		transform: rotate(0deg);
+	}
+}
+@utility sb-backend-mark {
+	@apply inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-stw-sm text-[10px] font-bold;
+	background: var(--warm-accent-soft);
+	color: var(--warm-accent);
+	font-family: var(--stw-font-mono);
+}
+@utility sb-status-dot {
+	@apply ml-auto h-1.5 w-1.5 shrink-0 rounded-full;
+	&.ok {
+		background: var(--warm-ok);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--warm-ok) 18%, transparent);
+	}
+	&.warn {
+		background: var(--warm-warn);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--warm-warn) 18%, transparent);
+	}
+	&.err {
+		background: var(--warm-err);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--warm-err) 18%, transparent);
+	}
+}
+@utility sb-tree-children {
+	@apply relative ml-[17px] flex flex-col gap-px border-l border-warm-border pl-2;
+}
+@utility sb-bucket-row {
+	padding-left: 8px;
+	& .sb-row-ico {
+		color: var(--warm-fg-faint);
+	}
+	&.active .sb-row-ico {
+		color: var(--warm-fg);
+	}
+}
+@utility sb-row-wrap {
+	@apply relative;
+}
+@utility sb-trail-btn {
+	@apply absolute inline-flex h-[22px] w-[22px] -translate-y-1/2 items-center justify-center rounded-stw-sm border-0 bg-transparent opacity-0 transition-[opacity,background,color] duration-[120ms];
+	top: 50%;
+	color: var(--warm-fg-faint);
+	cursor: pointer;
+	&.pin {
+		right: 32px;
+	}
+	&.settings {
+		right: 8px;
+	}
+	&.pin.active {
+		right: 8px;
+		opacity: 1;
+		color: var(--warm-accent);
+	}
+	.sb-row-wrap:hover &,
+	.sb-row-wrap:focus-within & {
 		opacity: 1;
 	}
+	&:hover {
+		background: var(--warm-bg-hover);
+		color: var(--warm-fg);
+	}
+}
+@utility sb-icon-btn {
+	@apply inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-warm-fg-muted transition-[background,color] duration-[120ms] hover:bg-warm-bg-hover hover:text-warm-fg;
+}
+@utility sb-foot {
+	@apply flex items-center gap-2 border-t border-warm-border p-2;
+}
+@utility sb-avatar {
+	@apply inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md text-[11px] font-semibold text-white;
+	background: linear-gradient(135deg, var(--warm-accent), #8a3f29);
+}
+@utility sb-who {
+	@apply flex min-w-0 flex-1 flex-col;
+}
+@utility sb-who-name {
+	@apply overflow-hidden text-[12.5px] text-ellipsis whitespace-nowrap text-warm-fg;
+	font-weight: 550;
+}
+@utility sb-who-sub {
+	@apply overflow-hidden text-[11px] text-ellipsis whitespace-nowrap text-warm-fg-muted;
 }
 
-:focus-visible {
-	outline: none;
-}
+/* ──────────────────────────────────────────────────────────────────────
+   Responsive shell — sidebar drawer + topbar widths.
+   ────────────────────────────────────────────────────────────────────── */
 
-/* ---- Responsive shell ---------------------------------------------------
- * Breakpoint: 768px. Below it, the sidebar becomes an off-canvas drawer and
- * a hamburger in the TopBar toggles it. Utility classes below are consumed
- * by the shell (layout, TopBar, Sidebar, DetailDrawer, BucketBrowser).
- */
-.stw-mobile-only {
+@utility stw-mobile-only {
 	display: none;
-}
-.stw-desktop-only {
-	display: initial;
-}
-
-/* Sidebar drawer wrapper: pass-through on desktop. */
-.stw-sidebar-slot {
-	display: contents;
-}
-
-/* Search box in TopBar: fixed widths on desktop, fluid on mobile. */
-.stw-topbar-search {
-	width: 320px;
-}
-.stw-topbar-search.wide {
-	width: 520px;
-}
-
-/* Fluid page padding for simple screens. */
-.stw-page-pad {
-	padding: clamp(12px, 3vw, 24px);
-}
-
-@media (max-width: 768px) {
-	.stw-mobile-only {
+	@media (max-width: 768px) {
 		display: inline-flex;
 	}
-	.stw-desktop-only {
+}
+@utility stw-desktop-only {
+	display: initial;
+	@media (max-width: 768px) {
 		display: none !important;
 	}
-
-	.stw-sidebar-slot {
+}
+@utility stw-sidebar-slot {
+	display: contents;
+	@media (max-width: 768px) {
 		position: fixed;
 		top: 0;
 		bottom: 0;
@@ -104,25 +998,196 @@ body {
 		transform: translateX(-100%);
 		transition: transform 200ms ease-out;
 		box-shadow: var(--stw-shadow-lg);
+		&.open {
+			transform: translateX(0);
+		}
 	}
-	.stw-sidebar-slot.open {
-		transform: translateX(0);
+}
+@utility stw-sidebar-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 45;
+	background: rgba(0, 0, 0, 0.4);
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+}
+@utility stw-topbar-search {
+	width: 320px;
+	&.wide {
+		width: 520px;
 	}
-
-	.stw-sidebar-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 45;
-		background: rgba(0, 0, 0, 0.4);
-		border: 0;
-		padding: 0;
-		cursor: pointer;
-	}
-
-	.stw-topbar-search,
-	.stw-topbar-search.wide {
+	@media (max-width: 768px) {
 		width: auto;
 		flex: 1;
 		min-width: 0;
+		&.wide {
+			width: auto;
+			flex: 1;
+			min-width: 0;
+		}
+	}
+}
+@utility stw-page-pad {
+	padding: clamp(12px, 3vw, 24px);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Share-recipient page (s/[code]) — single namespace, theme-aware.
+   ────────────────────────────────────────────────────────────────────── */
+
+@utility stw-share-page {
+	@apply flex min-h-screen flex-col items-center justify-center gap-4 bg-stw-bg p-4 text-stw-fg sm:p-8;
+}
+@utility stw-share-card {
+	@apply w-full max-w-[720px] overflow-hidden rounded-[14px] border border-stw-border bg-stw-bg-panel shadow-stw-lg;
+}
+@utility stw-share-status {
+	@apply flex flex-col items-center gap-3 px-6 py-14 text-center;
+	& h1 {
+		@apply m-0 text-[18px] text-stw-fg;
+	}
+}
+@utility stw-share-spinner {
+	@apply h-[22px] w-[22px] animate-stw-spin rounded-full border-2 border-stw-border;
+	border-top-color: var(--stw-accent-500);
+}
+@utility stw-share-pw {
+	@apply mx-auto flex max-w-[380px] flex-col items-stretch gap-3 px-7 pt-9 pb-7;
+	& h1 {
+		@apply m-0 mt-1 text-center text-[18px];
+	}
+	& p {
+		@apply m-0 mb-2 text-center;
+	}
+	& .stw-share-icon {
+		align-self: center;
+	}
+}
+@utility stw-share-pw-input {
+	@apply relative flex;
+	& input {
+		@apply flex-1 rounded-lg border border-stw-border bg-stw-bg-sunken py-2.5 pr-9 pl-3 text-[14px] text-stw-fg outline-none focus:border-stw-accent-500;
+	}
+}
+@utility stw-share-eye {
+	@apply absolute top-1 right-1 inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-stw-fg-mute;
+}
+@utility stw-share-err {
+	@apply m-0 text-center text-[13px] text-stw-err;
+}
+@utility stw-share-mute {
+	@apply m-0 mt-1 text-center text-[13px] text-stw-fg-mute;
+}
+@utility stw-share-icon {
+	@apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stw-accent-600;
+	background: color-mix(in oklch, var(--stw-accent-500) 12%, var(--stw-bg-panel));
+	border: 1px solid color-mix(in oklch, var(--stw-accent-500) 25%, var(--stw-border));
+}
+@utility stw-share-head {
+	@apply flex items-center gap-3 border-b border-stw-border px-[22px] py-[18px];
+	& h1 {
+		@apply m-0 overflow-hidden text-[17px] font-semibold text-ellipsis whitespace-nowrap;
+	}
+	& p {
+		@apply font-stw-mono text-[12px];
+	}
+}
+@utility stw-share-preview {
+	@apply flex min-h-[200px] items-center justify-center overflow-hidden bg-stw-bg-sunken;
+	max-height: min(70vh, 640px);
+	& img,
+	& video {
+		max-width: 100%;
+		max-height: min(70vh, 640px);
+		display: block;
+	}
+}
+@utility stw-share-audio {
+	@apply flex flex-col items-center gap-3.5 p-8 text-stw-fg-mute;
+	& audio {
+		width: min(100%, 420px);
+	}
+}
+@utility stw-share-iframe {
+	@apply h-[70vh] w-full border-0 bg-stw-bg;
+	max-height: 640px;
+}
+@utility stw-share-iframe--text {
+	background: #fff;
+}
+@utility stw-share-noprev {
+	@apply flex flex-col items-center gap-2.5 px-6 py-14 text-center text-[13px] text-stw-fg-mute;
+}
+@utility stw-share-foot {
+	@apply flex flex-wrap items-center gap-3 border-t border-stw-border px-[22px] py-3.5;
+}
+@utility stw-share-meta {
+	@apply flex min-w-0 flex-1 flex-wrap gap-1.5;
+}
+@utility stw-share-meta-pill {
+	@apply inline-flex items-center gap-1 rounded-stw-sm border border-stw-border bg-stw-bg-sunken px-2 py-[3px] text-[11.5px] text-stw-fg-mute;
+}
+@utility stw-share-cta {
+	@apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border-0 bg-stw-accent-500 px-4 py-2.5 text-[13px] font-semibold text-white no-underline transition-[background] duration-[120ms] hover:bg-stw-accent-600 disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility stw-share-brand {
+	@apply m-0 text-[11px] text-stw-fg-soft;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Inline preview (Preview.svelte).
+   ────────────────────────────────────────────────────────────────────── */
+
+@utility stw-preview {
+	@apply m-3.5 flex max-h-[60vh] min-h-[200px] flex-col overflow-hidden rounded-[7px] border border-stw-border bg-stw-bg-sunken;
+	& img {
+		@apply block h-auto w-full bg-checker;
+		max-height: 60vh;
+		object-fit: contain;
+	}
+	& video {
+		@apply block w-full;
+		max-height: 60vh;
+		background: black;
+	}
+	& iframe {
+		@apply block h-[60vh] w-full border-0 bg-white;
+	}
+	& pre {
+		@apply m-0 min-h-0 flex-1 overflow-auto p-3 font-stw-mono text-[12px] leading-[1.5] break-words whitespace-pre-wrap;
+	}
+}
+@utility stw-preview-fallback {
+	@apply flex flex-1 flex-col items-center justify-center gap-2.5 px-5 py-8 text-center;
+}
+@utility stw-preview-label {
+	@apply text-[12.5px] text-stw-fg-mute;
+}
+@utility stw-preview-link {
+	@apply text-[12.5px] text-stw-accent-600 no-underline hover:underline;
+}
+@utility stw-truncated-note {
+	@apply border-t border-stw-border bg-stw-bg-panel px-3 py-1.5 text-[11.5px] text-stw-fg-soft;
+	& a {
+		color: var(--stw-accent-600);
+	}
+}
+
+/* Base resets — only universal rules. */
+@layer base {
+	html,
+	body {
+		height: 100%;
+		margin: 0;
+	}
+	body {
+		background: var(--stw-bg);
+		color: var(--stw-fg);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+	:focus-visible {
+		outline: none;
 	}
 }

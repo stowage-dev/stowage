@@ -357,7 +357,7 @@
 	}
 </script>
 
-<div class="stw-page-pad mx-auto flex max-w-[880px] flex-col gap-[18px]">
+<div class="mx-auto flex max-w-[880px] flex-col gap-[18px] stw-page-pad">
 	<PageHeader title="Bucket settings" subtitle="{backendId}/{bucket}" />
 
 	{#if !data.backend}
@@ -370,18 +370,18 @@
 				<div class="flex items-start gap-4">
 					<div class="min-w-0 flex-1">
 						<h2 class="m-0 mb-1 text-[14px] font-semibold">Versioning</h2>
-						<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+						<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 							When on, every overwrite or delete keeps the previous version of the object. Required
 							for the version history panel.
 						</p>
 						{#if versioningError}
-							<p class="m-0 mt-1 text-[12px] text-[var(--stw-err)]">{versioningError}</p>
+							<p class="m-0 mt-1 text-[12px] text-stw-err">{versioningError}</p>
 						{/if}
 					</div>
 					{#if versioningReady}
 						<Toggle value={versioning} onchange={(v) => saveVersioning(v)} />
 					{:else}
-						<Skeleton w={44} h={22} style="border-radius:999px;flex-shrink:0;" />
+						<Skeleton w={44} h={22} class="shrink-0 rounded-full" />
 					{/if}
 				</div>
 			</SectionCard>
@@ -393,14 +393,14 @@
 					<h2 class="m-0 mb-1 inline-flex items-center gap-2 text-[14px] font-semibold">
 						<FolderTree size={14} strokeWidth={1.7} /> Bucket & folder size tracking
 					</h2>
-					<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+					<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 						When on, the proxy computes recursive byte totals for this bucket and renders them next
 						to the bucket name and each folder in the browser. Sizes refresh on a 30-minute schedule
 						plus a 60-second cache for ad-hoc folder lookups. Turning this off skips the bucket
 						entirely on the next scan and hides folder sizes in the browser.
 					</p>
 					{#if sizeTrackingError}
-						<p class="m-0 mt-1 text-[12px] text-[var(--stw-err)]">{sizeTrackingError}</p>
+						<p class="m-0 mt-1 text-[12px] text-stw-err">{sizeTrackingError}</p>
 					{/if}
 				</div>
 				{#if sizeTrackingReady}
@@ -412,7 +412,7 @@
 						}}
 					/>
 				{:else}
-					<Skeleton w={44} h={22} style="border-radius:999px;flex-shrink:0;" />
+					<Skeleton w={44} h={22} class="shrink-0 rounded-full" />
 				{/if}
 			</div>
 		</SectionCard>
@@ -423,7 +423,7 @@
 					<Database size={14} strokeWidth={1.7} />
 					<h2 class="m-0 text-[14px] font-semibold">Storage quota</h2>
 				</div>
-				<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+				<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 					Proxy-enforced caps. Soft quota fires a warning banner in the object browser when usage
 					exceeds it; hard quota rejects new uploads with HTTP 507 once full. Usage is sampled every
 					30 minutes — use Recompute for an immediate refresh.
@@ -431,18 +431,18 @@
 
 				{#if !quotaReady}
 					<div class="flex flex-col gap-1.5">
-						<Skeleton h={8} style="border-radius:999px;" />
+						<Skeleton h={8} class="rounded-full" />
 						<div class="flex flex-wrap gap-3">
 							<Skeleton w={120} h={12} />
 							<Skeleton w={70} h={12} />
 						</div>
 					</div>
 					<div class="grid grid-cols-2 gap-2.5">
-						<Skeleton h={32} style="border-radius:6px;" />
-						<Skeleton h={32} style="border-radius:6px;" />
+						<Skeleton h={32} class="rounded-stw-md" />
+						<Skeleton h={32} class="rounded-stw-md" />
 					</div>
 				{:else if quotaError}
-					<p class="m-0 text-[12px] text-[var(--stw-err)]">{quotaError}</p>
+					<p class="m-0 text-[12px] text-stw-err">{quotaError}</p>
 				{:else}
 					{#if quotaState?.has_usage}
 						{@const q = quotaState}
@@ -457,14 +457,14 @@
 								</span>
 								<span>{q.object_count ?? 0} objects</span>
 								{#if q.computed_at}
-									<span class="text-[11px] text-[var(--stw-fg-soft)]">
+									<span class="text-[11px] text-stw-fg-soft">
 										as of {new Date(q.computed_at).toLocaleString()}
 									</span>
 								{/if}
 							{/snippet}
 						</QuotaMeter>
 					{:else}
-						<p class="text-[12px] text-[var(--stw-fg-soft)]">
+						<p class="text-[12px] text-stw-fg-soft">
 							Usage hasn't been computed yet — set a quota or click Recompute.
 						</p>
 					{/if}
@@ -518,14 +518,14 @@
 						<h2 class="m-0 mb-1 inline-flex items-center gap-2 text-[14px] font-semibold">
 							<Globe size={14} strokeWidth={1.7} /> Public read access
 						</h2>
-						<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+						<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 							Installs the canned <code>s3:GetObject</code> Allow-everyone policy. Anyone with an
 							object key can fetch it. {#if policyReady && policy && !publicReadCanned}<strong
 									>This bucket has a custom policy</strong
 								> — toggle is disabled. Edit the policy below to change it.{/if}
 						</p>
 						{#if policyError}
-							<p class="m-0 mt-1 text-[12px] text-[var(--stw-err)]">{policyError}</p>
+							<p class="m-0 mt-1 text-[12px] text-stw-err">{policyError}</p>
 						{/if}
 					</div>
 					{#if policyReady}
@@ -541,7 +541,7 @@
 							}}
 						/>
 					{:else}
-						<Skeleton w={44} h={22} style="border-radius:999px;flex-shrink:0;" />
+						<Skeleton w={44} h={22} class="shrink-0 rounded-full" />
 					{/if}
 				</div>
 			</SectionCard>
@@ -552,13 +552,13 @@
 				<div class="flex flex-col gap-3">
 					<div>
 						<h2 class="m-0 mb-1 text-[14px] font-semibold">CORS rules</h2>
-						<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+						<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 							JSON array of rules. Each rule has <code>allowed_origins</code>,
 							<code>allowed_methods</code>, and optional <code>allowed_headers</code>,
 							<code>expose_headers</code>, <code>max_age_seconds</code>.
 						</p>
 						{#if corsError}
-							<p class="m-0 mt-1 text-[12px] text-[var(--stw-err)]">{corsError}</p>
+							<p class="m-0 mt-1 text-[12px] text-stw-err">{corsError}</p>
 						{/if}
 					</div>
 					{#if corsReady}
@@ -568,7 +568,7 @@
 							bind:value={corsJSON}
 						></textarea>
 					{:else}
-						<Skeleton h={160} style="border-radius:6px;display:block;" />
+						<Skeleton h={160} class="block rounded-stw-md" />
 					{/if}
 					<div class="flex justify-end">
 						{#snippet saveIcon()}<Save size={13} strokeWidth={1.7} />{/snippet}
@@ -590,7 +590,7 @@
 				<div class="flex flex-col gap-3">
 					<div>
 						<h2 class="m-0 mb-1 text-[14px] font-semibold">Bucket policy</h2>
-						<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+						<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 							Raw JSON policy document. Leave the editor empty and Save to delete the policy
 							entirely. Saving while the public-read toggle is on will overwrite the canned shape.
 						</p>
@@ -603,7 +603,7 @@
 							bind:value={policyJSON}
 						></textarea>
 					{:else}
-						<Skeleton h={160} style="border-radius:6px;display:block;" />
+						<Skeleton h={160} class="block rounded-stw-md" />
 					{/if}
 					<div class="flex justify-end">
 						{#snippet saveIcon()}<Save size={13} strokeWidth={1.7} />{/snippet}
@@ -625,32 +625,31 @@
 				<div class="flex flex-col gap-3">
 					<div>
 						<h2 class="m-0 mb-1 text-[14px] font-semibold">Lifecycle rules</h2>
-						<p class="m-0 text-[12.5px] leading-[1.5] text-[var(--stw-fg-mute)]">
+						<p class="m-0 text-[12.5px] leading-[1.5] text-stw-fg-mute">
 							Each rule applies to objects under <code>prefix</code> and triggers an action after the
 							given days. Supply at least one of expiration / noncurrent / abort-incomplete / transition.
 						</p>
 						{#if lifecycleError}
-							<p class="m-0 mt-1 text-[12px] text-[var(--stw-err)]">{lifecycleError}</p>
+							<p class="m-0 mt-1 text-[12px] text-stw-err">{lifecycleError}</p>
 						{/if}
 					</div>
 
 					{#if !lifecycleReady}
 						<div class="flex flex-col gap-1">
-							<Skeleton h={32} style="border-radius:6px;display:block;" />
-							<Skeleton h={32} style="border-radius:6px;display:block;" />
-							<Skeleton h={32} style="border-radius:6px;display:block;" />
+							<Skeleton h={32} class="block rounded-stw-md" />
+							<Skeleton h={32} class="block rounded-stw-md" />
+							<Skeleton h={32} class="block rounded-stw-md" />
 						</div>
 					{:else if lifecycle.length === 0}
 						<div
-							class="rounded-md border border-dashed border-[var(--stw-border)] p-5 text-center text-[13px] text-[var(--stw-fg-mute)]"
+							class="rounded-md border border-dashed border-stw-border p-5 text-center text-[13px] text-stw-fg-mute"
 						>
 							No rules configured.
 						</div>
 					{:else}
 						<div class="flex flex-col gap-1">
 							<div
-								class="grid items-center gap-1.5 px-1 text-[11px] font-semibold tracking-[0.04em] text-[var(--stw-fg-soft)] uppercase"
-								style="grid-template-columns:60px 1.2fr 1.4fr 90px 100px 110px 32px;"
+								class="grid grid-cols-[60px_1.2fr_1.4fr_90px_100px_110px_32px] items-center gap-1.5 px-1 text-[11px] font-semibold tracking-[0.04em] text-stw-fg-soft uppercase"
 							>
 								<span>Enabled</span>
 								<span>ID</span>
@@ -662,8 +661,7 @@
 							</div>
 							{#each lifecycle as _rule, i (i)}
 								<div
-									class="grid items-center gap-1.5"
-									style="grid-template-columns:60px 1.2fr 1.4fr 90px 100px 110px 32px;"
+									class="grid grid-cols-[60px_1.2fr_1.4fr_90px_100px_110px_32px] items-center gap-1.5"
 								>
 									<Toggle
 										value={lifecycle[i].enabled}
@@ -701,7 +699,7 @@
 										type="button"
 										onclick={() => removeLifecycleRule(i)}
 										aria-label="Remove rule"
-										class="stw-focus inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)]"
+										class="inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-stw-fg-mute focus-ring hover:bg-stw-bg-hover"
 									>
 										<Trash2 size={13} strokeWidth={1.7} />
 									</button>

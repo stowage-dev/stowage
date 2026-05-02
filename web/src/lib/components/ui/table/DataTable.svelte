@@ -72,9 +72,7 @@
 	}
 </script>
 
-<div
-	class="overflow-hidden rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] {extraClass}"
->
+<div class="overflow-hidden rounded-lg border border-stw-border bg-stw-bg-panel {extraClass}">
 	<div class="stw-scroll {scrollClass || 'overflow-hidden'}">
 		<table class="w-full border-separate border-spacing-0 text-[13px]">
 			{#if caption}
@@ -83,9 +81,7 @@
 			<thead>
 				{#each headerGroups as hg (hg.id)}
 					<tr
-						class="h-[32px] bg-[var(--stw-bg-sunken)] shadow-[inset_0_-1px_0_var(--stw-border)] {stickyHeader
-							? 'sticky top-0 z-10'
-							: ''}"
+						class="h-[32px] bg-stw-bg-sunken row-divider {stickyHeader ? 'sticky top-0 z-10' : ''}"
 					>
 						{#each hg.headers as h (h.id)}
 							{@const col = h.column.columnDef as Column<TData>}
@@ -95,7 +91,7 @@
 							{@const headerLabel = typeof col.header === 'string' ? col.header : ''}
 							<th
 								scope="col"
-								class="px-3 text-[11.5px] font-medium tracking-[0.04em] text-[var(--stw-fg-mute)] uppercase {alignCls(
+								class="px-3 text-[11.5px] font-medium tracking-[0.04em] text-stw-fg-mute uppercase {alignCls(
 									col.align
 								)} {extras.hClass}"
 							>
@@ -110,7 +106,7 @@
 								{:else if sortable}
 									<button
 										type="button"
-										class="stw-focus inline-flex cursor-pointer items-center gap-1.5 tracking-[0.04em] uppercase select-none hover:text-[var(--stw-fg)]"
+										class="focus-ring inline-flex cursor-pointer items-center gap-1.5 tracking-[0.04em] uppercase select-none hover:text-stw-fg"
 										onclick={h.column.getToggleSortingHandler()}
 									>
 										{headerLabel}
@@ -137,8 +133,8 @@
 					{@const extra = rowClass?.(r) ?? ''}
 					{@const clickable = !!onRowClick}
 					<tr
-						class="shadow-[inset_0_-1px_0_var(--stw-border)] {rowHeightCls} {clickable
-							? 'cursor-pointer hover:bg-[var(--stw-bg-hover)]'
+						class="row-divider {rowHeightCls} {clickable
+							? 'cursor-pointer hover:bg-stw-bg-hover'
 							: ''} {extra}"
 						onclick={clickable ? (e) => onRowClick(r, e) : undefined}
 						ondblclick={ondblclick ? (e) => ondblclick(r, e) : undefined}
@@ -151,10 +147,7 @@
 				{/each}
 				{#if rows.length === 0}
 					<tr>
-						<td
-							colspan={colCount}
-							class="px-4 py-10 text-center text-[13px] text-[var(--stw-fg-soft)]"
-						>
+						<td colspan={colCount} class="px-4 py-10 text-center text-[13px] text-stw-fg-soft">
 							{#if empty}{@render empty()}{:else}{emptyText}{/if}
 						</td>
 					</tr>

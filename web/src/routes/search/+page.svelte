@@ -71,7 +71,7 @@
 	});
 </script>
 
-<div class="stw-page-pad mx-auto flex max-w-[880px] flex-col gap-[18px]">
+<div class="mx-auto flex max-w-[880px] flex-col gap-[18px] stw-page-pad">
 	<PageHeader
 		title="Search"
 		subtitle="Match bucket names and object key prefixes across every configured backend."
@@ -105,7 +105,7 @@
 		{#if result.buckets.length > 0}
 			<section>
 				<h2
-					class="m-0 mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-[var(--stw-fg-soft)] uppercase"
+					class="m-0 mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-stw-fg-soft uppercase"
 				>
 					Buckets
 				</h2>
@@ -113,13 +113,13 @@
 					{#each result.buckets as b (b.backend_id + '/' + b.bucket)}
 						<button
 							type="button"
-							class="stw-focus flex cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3.5 py-2.5 text-[13px] text-[var(--stw-fg)] transition-[background] duration-[120ms] hover:bg-[var(--stw-bg-hover)]"
+							class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-stw-border bg-stw-bg-panel px-3.5 py-2.5 text-[13px] text-stw-fg focus-ring transition-[background] duration-[120ms] hover:bg-stw-bg-hover"
 							onclick={() => openBucket(b.backend_id, b.bucket)}
 						>
 							<Folder size={14} strokeWidth={1.7} />
 							<span class="flex-1 text-left font-mono">{b.bucket}</span>
 							<span
-								class="rounded border border-[var(--stw-border)] px-2 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
+								class="rounded border border-stw-border px-2 py-0.5 font-mono text-[11px] text-stw-fg-mute"
 							>
 								{b.backend_id}
 							</span>
@@ -132,7 +132,7 @@
 		{#if result.objects.length > 0}
 			<section>
 				<h2
-					class="m-0 mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-[var(--stw-fg-soft)] uppercase"
+					class="m-0 mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-stw-fg-soft uppercase"
 				>
 					Objects
 				</h2>
@@ -140,18 +140,18 @@
 					{#each result.objects as o (o.backend_id + '/' + o.bucket + '/' + o.key)}
 						<button
 							type="button"
-							class="stw-focus flex cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3.5 py-2.5 text-[13px] text-[var(--stw-fg)] transition-[background] duration-[120ms] hover:bg-[var(--stw-bg-hover)]"
+							class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-stw-border bg-stw-bg-panel px-3.5 py-2.5 text-[13px] text-stw-fg focus-ring transition-[background] duration-[120ms] hover:bg-stw-bg-hover"
 							onclick={() => openObject(o.backend_id, o.bucket, o.key)}
 						>
 							<FileText size={14} strokeWidth={1.7} />
 							<span class="min-w-0 flex-1 truncate text-left font-mono" title={o.key}>
 								{o.bucket}/{o.key}
 							</span>
-							<span class="font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+							<span class="font-mono text-[11.5px] text-stw-fg-mute">
 								{bytes(o.size)}
 							</span>
 							<span
-								class="rounded border border-[var(--stw-border)] px-2 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
+								class="rounded border border-stw-border px-2 py-0.5 font-mono text-[11px] text-stw-fg-mute"
 							>
 								{o.backend_id}
 							</span>

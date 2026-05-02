@@ -8,8 +8,6 @@
 	import AuthCard from '$lib/components/auth/AuthCard.svelte';
 	import { api, ApiException } from '$lib/api';
 	import { session, setSession } from '$lib/stores/session.svelte';
-	import { theme } from '$lib/stores/theme.svelte';
-	import '$lib/styles/auth.css';
 
 	const cfg = $derived(session.authConfig);
 	const hasOIDC = $derived(cfg?.modes.includes('oidc') ?? false);
@@ -64,10 +62,11 @@
 	<title>Sign in · stowage</title>
 </svelte:head>
 
-<div class="lg" class:dark={theme.value === 'dark'}>
-	<div class="auth-stack">
+<div class="lg-canvas">
+	<div class="pointer-events-none absolute inset-0 bg-dot-grid"></div>
+	<div class="lg-stack">
 		{#if showStaticBanner}
-			<div class="warn-banner" role="status">
+			<div class="lg-warn-banner" role="status">
 				<TriangleAlert size={14} strokeWidth={1.7} />
 				<span>Static admin enabled — disable in production.</span>
 			</div>
@@ -78,7 +77,7 @@
 			sub="Welcome back. Enter your credentials to access your buckets."
 		>
 			{#if formError}
-				<div class="err-banner" role="alert">
+				<div class="lg-err-banner" role="alert">
 					<svg
 						width="14"
 						height="14"
@@ -98,31 +97,31 @@
 			{/if}
 
 			{#if hasOIDC}
-				<button type="button" class="btn btn-primary" onclick={startOIDC}>
+				<button type="button" class="lg-btn lg-btn--primary" onclick={startOIDC}>
 					<Shield size={16} strokeWidth={1.7} /> Continue with SSO
 				</button>
 			{/if}
 
 			{#if hasOIDC && hasLocal && !showLocal}
-				<button type="button" class="link-btn" onclick={() => (showLocal = true)}>
+				<button type="button" class="lg-link-btn" onclick={() => (showLocal = true)}>
 					Sign in with username →
 				</button>
 			{/if}
 
 			{#if showLocal && hasLocal}
 				{#if hasOIDC}
-					<div class="auth-divider"><span>or</span></div>
+					<div class="lg-divider"><span>or</span></div>
 				{/if}
 
 				<form onsubmit={submitLocal} novalidate>
-					<div class="field">
-						<label for="login-username">Username</label>
-						<span class="prefix" aria-hidden="true">
+					<div class="lg-field">
+						<label for="login-username" class="lg-label">Username</label>
+						<span class="lg-prefix" aria-hidden="true">
 							<User size={14} strokeWidth={1.8} />
 						</span>
 						<input
 							id="login-username"
-							class="input with-prefix"
+							class="lg-input lg-input--with-prefix"
 							placeholder="username"
 							autocomplete="username"
 							bind:value={username}
@@ -130,14 +129,14 @@
 						/>
 					</div>
 
-					<div class="field">
-						<label for="login-password">Password</label>
-						<span class="prefix" aria-hidden="true">
+					<div class="lg-field">
+						<label for="login-password" class="lg-label">Password</label>
+						<span class="lg-prefix" aria-hidden="true">
 							<Lock size={14} strokeWidth={1.8} />
 						</span>
 						<input
 							id="login-password"
-							class="input with-prefix"
+							class="lg-input lg-input--with-prefix"
 							type={showPassword ? 'text' : 'password'}
 							autocomplete="current-password"
 							placeholder="••••••••••"
@@ -146,7 +145,7 @@
 						/>
 						<button
 							type="button"
-							class="suffix-btn"
+							class="lg-suffix-btn"
 							aria-label={showPassword ? 'Hide password' : 'Show password'}
 							onclick={() => (showPassword = !showPassword)}
 						>
@@ -160,12 +159,12 @@
 
 					<button
 						type="submit"
-						class="btn btn-primary"
+						class="lg-btn lg-btn--primary"
 						class:loading={submitting}
 						disabled={submitting}
 					>
 						{#if submitting}
-							<span class="spinner" aria-hidden="true"></span>Signing in…
+							<span class="lg-spinner" aria-hidden="true"></span>Signing in…
 						{:else}
 							Sign in
 						{/if}
@@ -174,13 +173,13 @@
 			{/if}
 
 			{#if !hasLocal && !hasOIDC && cfg}
-				<p class="sub" style="text-align:center;margin:0;">
+				<p class="lg-sub m-0 text-center">
 					No sign-in methods are enabled. Check the server config.
 				</p>
 			{/if}
 
 			{#snippet footer()}
-				<div class="legal">stowage v1.0</div>
+				<div class="lg-legal">stowage v1.0</div>
 			{/snippet}
 		</AuthCard>
 	</div>
