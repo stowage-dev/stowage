@@ -11,7 +11,12 @@
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import SearchField from '$lib/components/ui/SearchField.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import {
+		DataTable,
+		DataTablePagination,
+		createDataTable,
+		type Column
+	} from '$lib/components/ui/table';
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import StatLine from '$lib/components/ui/StatLine.svelte';
 	import CreateUserPanel from './CreateUserPanel.svelte';
@@ -34,15 +39,7 @@
 	let showCreate = $state(false);
 	let resetTarget = $state<User | null>(null);
 
-	const list = $derived(
-		users.filter(
-			(u) =>
-				(roleFilter === 'all' || u.role === roleFilter) &&
-				(q === '' ||
-					u.username.toLowerCase().includes(q.toLowerCase()) ||
-					(u.email ?? '').toLowerCase().includes(q.toLowerCase()))
-		)
-	);
+	const list = $derived(users.filter((u) => roleFilter === 'all' || u.role === roleFilter));
 
 	const meId = $derived(session.me?.id);
 	const roles: RoleFilter[] = ['all', 'admin', 'editor', 'viewer'];
@@ -81,15 +78,33 @@
 		return { type, issuer };
 	}
 
-	const columns = [
-		{ key: 'login', label: 'Login' },
-		{ key: 'email', label: 'Email' },
-		{ key: 'source', label: 'Source' },
-		{ key: 'role', label: 'Role' },
-		{ key: 'status', label: 'Status' },
-		{ key: 'created', label: 'Created' },
-		{ key: 'actions', label: '', align: 'right' as const }
+	const columns: Column<User>[] = [
+		{ id: 'login', accessorKey: 'username', header: 'Login', enableSorting: true },
+		{ id: 'email', accessorKey: 'email', header: 'Email', enableSorting: true },
+		{ id: 'source', accessorKey: 'identity_source', header: 'Source', enableSorting: true },
+		{ id: 'role', accessorKey: 'role', header: 'Role', enableSorting: true },
+		{ id: 'status', header: 'Status' },
+		{ id: 'created', accessorKey: 'created_at', header: 'Created', enableSorting: true },
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
 	];
+
+	const userTable = createDataTable<User>({
+		data: () => list,
+		columns,
+		initialSorting: [{ id: 'login', desc: false }],
+		enablePagination: true,
+		pageSize: 50,
+		globalFilterFn: (row, _id, value) => {
+			const v = String(value ?? '').toLowerCase();
+			if (!v) return true;
+			const u = row.original;
+			return u.username.toLowerCase().includes(v) || (u.email ?? '').toLowerCase().includes(v);
+		}
+	});
+
+	$effect(() => {
+		userTable.table.setGlobalFilter(q);
+	});
 </script>
 
 <div class="stw-page-pad flex flex-col gap-4">
@@ -126,7 +141,7 @@
 		</Banner>
 	{/if}
 
-	<DataTable {columns} rows={list} emptyText="No users match.">
+	<DataTable table={userTable.table} emptyText="No users match.">
 		{#snippet row(u)}
 			{@const src = shortSource(u.identity_source)}
 			{@const locked = !!u.locked_until && new Date(u.locked_until).getTime() > Date.now()}
@@ -198,6 +213,9 @@
 			</td>
 		{/snippet}
 	</DataTable>
+	{#if list.length > 50}
+		<DataTablePagination table={userTable.table} />
+	{/if}
 </div>
 
 {#if showCreate}

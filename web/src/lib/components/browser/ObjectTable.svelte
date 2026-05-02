@@ -4,6 +4,7 @@
 	import { Share2, Download } from 'lucide-svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
+	import { DataTable, createDataTable, type Column } from '$lib/components/ui/table';
 	import ObjectIcon from './ObjectIcon.svelte';
 	import { bytes } from '$lib/format';
 	import type { BrowserItem } from '$lib/types';
@@ -43,9 +44,6 @@
 		return bytes(s);
 	}
 
-	const rowHCls = $derived(
-		density === 'compact' ? 'h-[32px]' : density === 'cosy' ? 'h-[40px]' : 'h-[48px]'
-	);
 	const cellPadCls = $derived(density === 'compact' ? 'px-2' : 'px-3');
 	const cellPadLCls = $derived(density === 'compact' ? 'pl-2' : 'pl-3');
 
@@ -106,114 +104,129 @@
 		if (el) el.indeterminate = selected.length > 0 && selected.length < items.length;
 	}
 
-	const headThCls =
-		'text-left text-[11.5px] font-medium tracking-[0.02em] text-[var(--stw-fg-mute)]';
+	const columns: Column<BrowserItem>[] = [
+		{ id: 'select', header: '', enableSorting: false, headerClass: 'w-[32px]' },
+		{ id: 'name', accessorKey: 'displayName', header: 'Name', enableSorting: true },
+		{
+			id: 'size',
+			accessorKey: 'size',
+			header: 'Size',
+			align: 'right',
+			enableSorting: true,
+			headerClass: 'w-[110px]'
+		},
+		{
+			id: 'modified',
+			accessorKey: 'modified',
+			header: 'Modified',
+			enableSorting: true,
+			headerClass: 'w-[170px]'
+		},
+		{ id: 'type', accessorKey: 'ct', header: 'Type', headerClass: 'w-[130px]' },
+		{ id: 'actions', header: '', enableSorting: false, headerClass: 'w-[60px]' }
+	];
+
+	const objectTable = createDataTable<BrowserItem>({
+		data: () => items,
+		columns,
+		initialSorting: [{ id: 'name', desc: false }]
+	});
 </script>
 
-<div class="stw-scroll flex-1 overflow-auto bg-[var(--stw-bg-panel)]">
-	<table class="w-full border-separate border-spacing-0 text-[13px]">
-		<thead>
-			<tr
-				class="sticky top-0 z-[1] h-[30px] bg-[var(--stw-bg-panel)] shadow-[inset_0_-1px_0_var(--stw-border)]"
-			>
-				<th class="w-[32px] {cellPadLCls} text-left align-middle">
-					<input
-						type="checkbox"
-						class="stw-check"
-						aria-label="Select all"
-						checked={selected.length > 0 && selected.length === items.length}
-						use:indeterminate
-						onchange={(e) => selectAll((e.target as HTMLInputElement).checked)}
-					/>
-				</th>
-				<th class="{headThCls} {cellPadCls}">Name</th>
-				<th class="{headThCls} {cellPadCls} w-[110px] text-right">Size</th>
-				<th class="{headThCls} {cellPadCls} w-[170px]">Modified</th>
-				<th class="{headThCls} {cellPadCls} w-[130px]">Type</th>
-				<th class="w-[60px]"></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each items as o (o.key)}
-				{@const sel = selected.includes(o.key)}
-				<tr
-					class="group cursor-pointer shadow-[inset_0_-1px_0_var(--stw-border)] {rowHCls} {sel
-						? 'bg-[var(--stw-bg-sel)]'
-						: 'hover:bg-[var(--stw-bg-hover)]'}"
-					onclick={(e) => onRowClick(o.key, e)}
-					ondblclick={() => (o.kind === 'folder' ? onopen(o) : onpreview(o))}
+{#snippet selectAllCheckboxHeader()}
+	<input
+		type="checkbox"
+		class="stw-check"
+		aria-label="Select all"
+		checked={selected.length > 0 && selected.length === items.length}
+		use:indeterminate
+		onchange={(e) => selectAll((e.target as HTMLInputElement).checked)}
+	/>
+{/snippet}
+
+<DataTable
+	table={objectTable.table}
+	stickyHeader
+	{density}
+	scrollClass="overflow-auto"
+	class="flex-1 rounded-none border-0"
+	emptyText=""
+	headerSnippets={{ select: selectAllCheckboxHeader }}
+	rowClass={(r) => (selected.includes(r.original.key) ? 'bg-[var(--stw-bg-sel)] group' : 'group')}
+	onRowClick={(r, e) => onRowClick(r.original.key, e)}
+	ondblclick={(r) => (r.original.kind === 'folder' ? onopen(r.original) : onpreview(r.original))}
+>
+	{#snippet row(o)}
+		{@const sel = selected.includes(o.key)}
+		<td class={cellPadLCls + ' align-middle'}>
+			<input
+				type="checkbox"
+				class="stw-check"
+				aria-label={sel ? `Deselect ${o.displayName}` : `Select ${o.displayName}`}
+				checked={sel}
+				onclick={(e) => onCheckboxClick(o.key, e)}
+			/>
+		</td>
+		<td class={cellPadCls}>
+			<span class="inline-flex items-center gap-2.5">
+				<ObjectIcon kind={o.kind} />
+				<span
+					role="button"
+					tabindex="0"
+					onclick={(e) => {
+						e.stopPropagation();
+						if (o.kind === 'folder') onopen(o);
+						else onpreview(o);
+					}}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.stopPropagation();
+							if (o.kind === 'folder') onopen(o);
+							else onpreview(o);
+						}
+					}}
+					class="cursor-pointer text-[var(--stw-fg)] {o.kind === 'folder'
+						? 'font-medium'
+						: 'font-normal'}"
 				>
-					<td class="{cellPadLCls} align-middle">
-						<input
-							type="checkbox"
-							class="stw-check"
-							aria-label={sel ? `Deselect ${o.displayName}` : `Select ${o.displayName}`}
-							checked={sel}
-							onclick={(e) => onCheckboxClick(o.key, e)}
+					{o.displayName}
+				</span>
+			</span>
+		</td>
+		<td
+			class={cellPadCls +
+				' text-right font-mono text-[12px] text-[var(--stw-fg-mute)] tabular-nums'}
+		>
+			{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
+		</td>
+		<td class={cellPadCls + ' font-mono text-[12px] text-[var(--stw-fg-mute)]'}>
+			{o.modified ? new Date(o.modified).toLocaleString() : '—'}
+		</td>
+		<td class={cellPadCls + ' font-mono text-[12px] text-[var(--stw-fg-mute)]'}>
+			{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
+		</td>
+		<td class={cellPadCls + ' text-right'} onclick={(e) => e.stopPropagation()}>
+			{#if o.kind !== 'folder'}
+				<span
+					class="inline-flex gap-0.5 transition-opacity duration-[120ms] group-hover:opacity-100 {sel
+						? 'opacity-100'
+						: 'opacity-0'}"
+				>
+					{#snippet shareIcon()}<Share2 size={13} strokeWidth={1.7} />{/snippet}
+					{#snippet downloadIcon()}<Download size={13} strokeWidth={1.7} />{/snippet}
+					<Tooltip text="Share">
+						<IconButton label="Share" size={24} icon={shareIcon} onclick={() => onshare(o)} />
+					</Tooltip>
+					<Tooltip text="Download">
+						<IconButton
+							label="Download"
+							size={24}
+							icon={downloadIcon}
+							onclick={() => ondownload?.(o)}
 						/>
-					</td>
-					<td class={cellPadCls}>
-						<span class="inline-flex items-center gap-2.5">
-							<ObjectIcon kind={o.kind} />
-							<span
-								role="button"
-								tabindex="0"
-								onclick={(e) => {
-									e.stopPropagation();
-									if (o.kind === 'folder') onopen(o);
-									else onpreview(o);
-								}}
-								onkeydown={(e) => {
-									if (e.key === 'Enter') {
-										e.stopPropagation();
-										if (o.kind === 'folder') onopen(o);
-										else onpreview(o);
-									}
-								}}
-								class="cursor-pointer text-[var(--stw-fg)] {o.kind === 'folder'
-									? 'font-medium'
-									: 'font-normal'}"
-							>
-								{o.displayName}
-							</span>
-						</span>
-					</td>
-					<td
-						class="{cellPadCls} text-right font-mono text-[12px] text-[var(--stw-fg-mute)] tabular-nums"
-					>
-						{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
-					</td>
-					<td class="{cellPadCls} font-mono text-[12px] text-[var(--stw-fg-mute)]">
-						{o.modified ? new Date(o.modified).toLocaleString() : '—'}
-					</td>
-					<td class="{cellPadCls} font-mono text-[12px] text-[var(--stw-fg-mute)]">
-						{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
-					</td>
-					<td class="{cellPadCls} text-right" onclick={(e) => e.stopPropagation()}>
-						{#if o.kind !== 'folder'}
-							<span
-								class="inline-flex gap-0.5 transition-opacity duration-[120ms] group-hover:opacity-100 {sel
-									? 'opacity-100'
-									: 'opacity-0'}"
-							>
-								{#snippet shareIcon()}<Share2 size={13} strokeWidth={1.7} />{/snippet}
-								{#snippet downloadIcon()}<Download size={13} strokeWidth={1.7} />{/snippet}
-								<Tooltip text="Share">
-									<IconButton label="Share" size={24} icon={shareIcon} onclick={() => onshare(o)} />
-								</Tooltip>
-								<Tooltip text="Download">
-									<IconButton
-										label="Download"
-										size={24}
-										icon={downloadIcon}
-										onclick={() => ondownload?.(o)}
-									/>
-								</Tooltip>
-							</span>
-						{/if}
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
+					</Tooltip>
+				</span>
+			{/if}
+		</td>
+	{/snippet}
+</DataTable>

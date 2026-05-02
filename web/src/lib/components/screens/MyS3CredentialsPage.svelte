@@ -12,7 +12,12 @@
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import StatLine from '$lib/components/ui/StatLine.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import {
+		DataTable,
+		DataTablePagination,
+		createDataTable,
+		type Column
+	} from '$lib/components/ui/table';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import S3CredentialDrawer from './S3CredentialDrawer.svelte';
 	import { api, ApiException } from '$lib/api';
@@ -45,14 +50,9 @@
 		}).length
 	);
 
-	const filtered = $derived(
-		creds.filter((c) => {
-			if (q === '') return true;
-			const hay =
-				`${c.access_key} ${c.backend_id} ${c.buckets.join(' ')} ${c.description ?? ''}`.toLowerCase();
-			return hay.includes(q.toLowerCase());
-		})
-	);
+	function credHaystack(c: S3Credential): string {
+		return `${c.access_key} ${c.backend_id} ${c.buckets.join(' ')} ${c.description ?? ''}`.toLowerCase();
+	}
 
 	async function refresh(): Promise<void> {
 		busy = true;
@@ -102,15 +102,37 @@
 		return { text: new Date(s).toLocaleDateString(), tone: 'normal' };
 	}
 
-	const columns = [
-		{ key: 'akid', label: 'Access key' },
-		{ key: 'backend', label: 'Backend' },
-		{ key: 'buckets', label: 'Buckets' },
-		{ key: 'description', label: 'Description' },
-		{ key: 'expires', label: 'Expires', align: 'right' as const },
-		{ key: 'status', label: 'Status', align: 'right' as const },
-		{ key: 'actions', label: '', align: 'right' as const }
+	const columns: Column<S3Credential>[] = [
+		{ id: 'akid', accessorKey: 'access_key', header: 'Access key', enableSorting: true },
+		{ id: 'backend', accessorKey: 'backend_id', header: 'Backend', enableSorting: true },
+		{ id: 'buckets', header: 'Buckets', enableSorting: false },
+		{ id: 'description', accessorKey: 'description', header: 'Description', enableSorting: true },
+		{
+			id: 'expires',
+			accessorKey: 'expires_at',
+			header: 'Expires',
+			align: 'right',
+			enableSorting: true
+		},
+		{ id: 'status', accessorKey: 'enabled', header: 'Status', align: 'right', enableSorting: true },
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
 	];
+
+	const credTable = createDataTable<S3Credential>({
+		data: () => creds,
+		columns,
+		initialSorting: [{ id: 'akid', desc: false }],
+		enablePagination: true,
+		pageSize: 50,
+		globalFilterFn: (row, _id, value) => {
+			const v = String(value ?? '').toLowerCase();
+			return v === '' || credHaystack(row.original).includes(v);
+		}
+	});
+
+	$effect(() => {
+		credTable.table.setGlobalFilter(q);
+	});
 
 	onMount(() => {
 		void refresh();
@@ -157,7 +179,7 @@
 			</div>
 		</EmptyState>
 	{:else}
-		<DataTable {columns} rows={filtered} emptyText="No credentials match.">
+		<DataTable table={credTable.table} emptyText="No credentials match.">
 			{#snippet row(c)}
 				{@const exp = expiresLabel(c.expires_at)}
 				<td class="px-3 font-mono text-[12.5px]">{c.access_key}</td>
@@ -197,6 +219,9 @@
 				</td>
 			{/snippet}
 		</DataTable>
+		{#if creds.length > 50}
+			<DataTablePagination table={credTable.table} />
+		{/if}
 	{/if}
 </div>
 
