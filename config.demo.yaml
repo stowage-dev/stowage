@@ -14,6 +14,14 @@ s3_proxy:
   enabled: true
   anonymous_enabled: true
 
+# Demo only — disable the per-session API rate limit so deep-folder
+# browsing (one ListObjects per directory) doesn't trip the default
+# 600 req/min cap when virtualized scrolling fires off bursts of
+# folder-size lookups. Real deployments should leave this at the
+# default and tune up if needed.
+ratelimit:
+  api_per_minute: 0
+
 server:
   listen: ":8080"
   secret_key_file: ./stowage.key
