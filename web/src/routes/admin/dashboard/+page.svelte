@@ -80,7 +80,7 @@
 	});
 </script>
 
-<div class="stw-page-pad mx-auto flex max-w-[1100px] flex-col gap-[18px]">
+<div class="mx-auto flex max-w-[1100px] flex-col gap-[18px] stw-page-pad">
 	<PageHeader
 		title="Admin dashboard"
 		subtitle="Live request volume from this proxy and storage usage from the quota cache."
@@ -102,7 +102,7 @@
 	{:else}
 		{@const d = data.dashboard}
 
-		<div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+		<div class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
 			{#snippet activityIcon()}<Activity size={14} strokeWidth={1.7} />{/snippet}
 			{#snippet hardDriveIcon()}<HardDrive size={14} strokeWidth={1.7} />{/snippet}
 			{#snippet databaseIcon()}<Database size={14} strokeWidth={1.7} />{/snippet}
@@ -142,10 +142,9 @@
 		<SectionCard title="Hourly requests (last 24h)">
 			{#snippet icon()}<Activity size={14} strokeWidth={1.7} />{/snippet}
 			<div
-				class="grid h-[120px] items-end gap-[3px] px-1 pt-2 pb-1"
+				class="grid h-[120px] grid-cols-[repeat(24,1fr)] items-end gap-[3px] px-1 pt-2 pb-1"
 				role="img"
 				aria-label="Hourly request histogram"
-				style="grid-template-columns:repeat(24,1fr);"
 			>
 				{#each d.requests.hourly as h (h.unix_hour)}
 					{@const pct = (h.requests / peak) * 100}
@@ -155,27 +154,27 @@
 						title="{hourLabel(h.unix_hour)}h · {h.requests} req · {h.errors} err"
 					>
 						<div
-							class="relative min-h-[1px] w-full rounded-t bg-[var(--stw-accent-500)] transition-[height] duration-200"
+							class="relative min-h-[1px] w-full rounded-t bg-stw-accent-500 transition-[height] duration-200"
 							style="height:{pct}%;"
 						>
 							{#if errPct > 0}
 								<div
-									class="absolute top-0 right-0 left-0 bg-[var(--stw-err)]"
+									class="absolute top-0 right-0 left-0 bg-stw-err"
 									style="height:{errPct}%;"
 								></div>
 							{/if}
 						</div>
-						<span class="font-mono text-[9.5px] text-[var(--stw-fg-soft)]">
+						<span class="font-mono text-[9.5px] text-stw-fg-soft">
 							{hourLabel(h.unix_hour)}
 						</span>
 					</div>
 				{/each}
 			</div>
 			{#if Object.keys(d.requests.by_backend).length > 0}
-				<div class="mt-2 flex flex-wrap gap-1.5 border-t border-[var(--stw-border)] pt-2">
+				<div class="mt-2 flex flex-wrap gap-1.5 border-t border-stw-border pt-2">
 					{#each Object.entries(d.requests.by_backend) as [bid, count] (bid)}
 						<span
-							class="inline-flex items-center gap-1 rounded border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-2 py-0.5 text-[11.5px] text-[var(--stw-fg-mute)]"
+							class="inline-flex items-center gap-1 rounded border border-stw-border bg-stw-bg-sunken px-2 py-0.5 text-[11.5px] text-stw-fg-mute"
 						>
 							<strong>{bid}</strong> · {num(count as number)} req
 						</span>
@@ -187,7 +186,7 @@
 		<SectionCard title="Storage by backend">
 			{#snippet icon()}<HardDrive size={14} strokeWidth={1.7} />{/snippet}
 			{#if d.storage.cache_note}
-				<p class="m-0 mb-2 text-[11.5px] text-[var(--stw-fg-soft)]">{d.storage.cache_note}</p>
+				<p class="m-0 mb-2 text-[11.5px] text-stw-fg-soft">{d.storage.cache_note}</p>
 			{/if}
 			<DataTable table={storageTable.table} density="compact" emptyText="No tracked buckets yet.">
 				{#snippet row(r)}
@@ -219,10 +218,10 @@
 			{#snippet icon()}<AlertTriangle size={14} strokeWidth={1.7} />{/snippet}
 			<DataTable table={errorTable.table} density="compact" emptyText="No recent server errors. 🎉">
 				{#snippet row(e)}
-					<td class="px-3 text-[11.5px] text-[var(--stw-fg-soft)]">
+					<td class="px-3 text-[11.5px] text-stw-fg-soft">
 						{new Date(e.when).toLocaleTimeString()}
 					</td>
-					<td class="px-3 text-right font-mono text-[var(--stw-err)]">{e.status}</td>
+					<td class="px-3 text-right font-mono text-stw-err">{e.status}</td>
 					<td class="px-3">{e.method}</td>
 					<td class="px-3 font-mono text-[11.5px]">{e.path}</td>
 					<td class="px-3">{e.backend ?? '—'}</td>

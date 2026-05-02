@@ -12,11 +12,13 @@
 	let { kind, size = 18 }: Props = $props();
 
 	const info = $derived(BACKEND_KINDS[kind] ?? BACKEND_KINDS.generic);
+	const fontPx = $derived(Math.round(size * 0.58));
 </script>
 
 <span
 	aria-hidden="true"
-	style="display:inline-flex;align-items:center;justify-content:center;width:{size}px;height:{size}px;border-radius:4px;background:{info.color};color:#fff;font-size:{Math.round(
-		size * 0.58
-	)}px;font-weight:600;font-family:var(--stw-font-mono);flex-shrink:0;">{info.letter}</span
+	class="inline-flex shrink-0 items-center justify-center rounded-stw-sm font-stw-mono font-semibold text-white"
+	style="width:{size}px;height:{size}px;background:{info.color};font-size:{fontPx}px;"
 >
+	{info.letter}
+</span>

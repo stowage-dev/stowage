@@ -152,7 +152,7 @@
 	class="flex-1 rounded-none border-0"
 	emptyText=""
 	headerSnippets={{ select: selectAllCheckboxHeader }}
-	rowClass={(r) => (selected.includes(r.original.key) ? 'bg-[var(--stw-bg-sel)] group' : 'group')}
+	rowClass={(r) => (selected.includes(r.original.key) ? 'bg-stw-bg-sel group' : 'group')}
 	onRowClick={(r, e) => onRowClick(r.original.key, e)}
 	ondblclick={(r) => (r.original.kind === 'folder' ? onopen(r.original) : onpreview(r.original))}
 >
@@ -185,24 +185,19 @@
 							else onpreview(o);
 						}
 					}}
-					class="cursor-pointer text-[var(--stw-fg)] {o.kind === 'folder'
-						? 'font-medium'
-						: 'font-normal'}"
+					class="cursor-pointer text-stw-fg {o.kind === 'folder' ? 'font-medium' : 'font-normal'}"
 				>
 					{o.displayName}
 				</span>
 			</span>
 		</td>
-		<td
-			class={cellPadCls +
-				' text-right font-mono text-[12px] text-[var(--stw-fg-mute)] tabular-nums'}
-		>
+		<td class={cellPadCls + ' text-right font-mono text-[12px] text-stw-fg-mute tabular-nums'}>
 			{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
 		</td>
-		<td class={cellPadCls + ' font-mono text-[12px] text-[var(--stw-fg-mute)]'}>
+		<td class={cellPadCls + ' font-mono text-[12px] text-stw-fg-mute'}>
 			{o.modified ? new Date(o.modified).toLocaleString() : '—'}
 		</td>
-		<td class={cellPadCls + ' font-mono text-[12px] text-[var(--stw-fg-mute)]'}>
+		<td class={cellPadCls + ' font-mono text-[12px] text-stw-fg-mute'}>
 			{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
 		</td>
 		<td class={cellPadCls + ' text-right'} onclick={(e) => e.stopPropagation()}>

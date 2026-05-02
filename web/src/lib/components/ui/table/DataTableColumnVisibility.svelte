@@ -34,7 +34,7 @@
 	<Button size="sm" {icon} onclick={() => (open = !open)}>{label}</Button>
 	{#if open}
 		<div
-			class="absolute right-0 z-20 mt-1 flex min-w-[200px] flex-col gap-0.5 rounded-md border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] p-1 text-[12.5px] shadow-[var(--stw-shadow-md)]"
+			class="absolute right-0 z-20 mt-1 flex min-w-[200px] flex-col gap-0.5 rounded-md border border-stw-border bg-stw-bg-panel p-1 text-[12.5px] shadow-stw-md"
 			role="menu"
 		>
 			{#each hidableColumns as col (col.id)}
@@ -43,7 +43,7 @@
 						? col.columnDef.header
 						: col.id}
 				<label
-					class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[var(--stw-bg-hover)]"
+					class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-stw-bg-hover"
 				>
 					<input
 						type="checkbox"

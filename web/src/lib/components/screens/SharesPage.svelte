@@ -155,7 +155,7 @@
 	});
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader title="Shares">
 		{#snippet meta()}
 			<StatLine
@@ -210,11 +210,11 @@
 						<div class="truncate font-mono" title="{s.backend_id}/{s.bucket}/{s.key}">
 							{s.bucket}/{s.key}
 						</div>
-						<div class="flex items-center gap-1.5 text-[11px] text-[var(--stw-fg-soft)]">
+						<div class="flex items-center gap-1.5 text-[11px] text-stw-fg-soft">
 							<span>{s.backend_id}</span>
 							{#if s.has_password}
 								<span
-									class="inline-flex items-center gap-0.5 text-[var(--stw-warn)]"
+									class="inline-flex items-center gap-0.5 text-stw-warn"
 									title="Password-protected"
 								>
 									<Lock size={10} strokeWidth={1.7} />
@@ -226,24 +226,24 @@
 						</div>
 					</div>
 				</td>
-				<td class="px-3 font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+				<td class="px-3 font-mono text-[11.5px] text-stw-fg-mute">
 					<span class="block max-w-[180px] truncate" title={url}>/s/{s.code}</span>
 				</td>
 				<td class="px-3 text-right font-mono">
-					{num(s.download_count)}{#if s.max_downloads}<span class="text-[var(--stw-fg-soft)]"
+					{num(s.download_count)}{#if s.max_downloads}<span class="text-stw-fg-soft"
 							>/{s.max_downloads}</span
 						>{/if}
 				</td>
 				<td
 					class="px-3 text-right text-[12px] {exp.tone === 'warn'
-						? 'text-[var(--stw-warn)]'
+						? 'text-stw-warn'
 						: exp.tone === 'soft'
-							? 'text-[var(--stw-fg-soft)]'
-							: 'text-[var(--stw-fg-mute)]'}"
+							? 'text-stw-fg-soft'
+							: 'text-stw-fg-mute'}"
 				>
 					{exp.text}
 				</td>
-				<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+				<td class="px-3 text-right font-mono text-[11.5px] text-stw-fg-soft">
 					{new Date(s.created_at).toLocaleDateString()}
 				</td>
 				<td class="px-3 text-right">
