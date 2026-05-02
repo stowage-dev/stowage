@@ -13,7 +13,7 @@
 	import Dot from '$lib/components/ui/Dot.svelte';
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import StatLine from '$lib/components/ui/StatLine.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import { DataTable, createDataTable, type Column } from '$lib/components/ui/table';
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import { urlForRoute } from '$lib/route';
 	import { inferKind, backendHealth } from '$lib/backend-kind';
@@ -21,7 +21,7 @@
 	import { bytes as fmtBytes } from '$lib/format';
 	import { session } from '$lib/stores/session.svelte';
 	import { refreshBuckets, type BucketState } from '$lib/stores/buckets.svelte';
-	import type { Backend } from '$lib/types';
+	import type { Backend, Bucket } from '$lib/types';
 
 	interface Props {
 		backend: Backend;
@@ -81,12 +81,18 @@
 		}
 	}
 
-	const columns = [
-		{ key: 'name', label: 'Name' },
-		{ key: 'size', label: 'Size' },
-		{ key: 'created', label: 'Created' },
-		{ key: 'actions', label: '', align: 'right' as const }
+	const columns: Column<Bucket>[] = [
+		{ id: 'name', accessorKey: 'name', header: 'Name', enableSorting: true },
+		{ id: 'size', accessorKey: 'size_bytes', header: 'Size', enableSorting: true },
+		{ id: 'created', accessorKey: 'created_at', header: 'Created', enableSorting: true },
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
 	];
+
+	const bucketTable = createDataTable<Bucket>({
+		data: () => list,
+		columns,
+		initialSorting: [{ id: 'name', desc: false }]
+	});
 </script>
 
 <div class="stw-page-pad">
@@ -145,13 +151,14 @@
 		</form>
 	{/if}
 
-	<DataTable {columns} rows={list} emptyText={loading ? 'Loading…' : 'No buckets yet.'}>
+	<DataTable
+		table={bucketTable.table}
+		emptyText={loading ? 'Loading…' : 'No buckets yet.'}
+		onRowClick={(row) =>
+			goto(urlForRoute({ type: 'bucket', backend: b.id, bucket: row.original.name, prefix: [] }))}
+	>
 		{#snippet row(bk)}
-			<td
-				class="cursor-pointer px-3 hover:bg-[var(--stw-bg-hover)]"
-				onclick={() =>
-					goto(urlForRoute({ type: 'bucket', backend: b.id, bucket: bk.name, prefix: [] }))}
-			>
+			<td class="px-3">
 				<span class="inline-flex items-center gap-2">
 					<Folder size={14} strokeWidth={1.7} />
 					<span class="font-medium">{bk.name}</span>

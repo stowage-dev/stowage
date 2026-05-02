@@ -21,6 +21,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import StatLine from '$lib/components/ui/StatLine.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import { DataTable, createDataTable, type Column } from '$lib/components/ui/table';
 	import { api, ApiException } from '$lib/api';
 	import { num } from '$lib/format';
 	import { session } from '$lib/stores/session.svelte';
@@ -42,13 +43,9 @@
 	let busy = $state(false);
 	let copiedID = $state<string | null>(null);
 
-	const filtered = $derived(
-		shares.filter((s) => {
-			if (q === '') return true;
-			const hay = `${s.bucket}/${s.key} ${s.code} ${s.created_by}`.toLowerCase();
-			return hay.includes(q.toLowerCase());
-		})
-	);
+	function shareHaystack(s: Share): string {
+		return `${s.bucket}/${s.key} ${s.code} ${s.created_by}`.toLowerCase();
+	}
 	const activeCount = $derived(shares.filter((s) => !s.revoked && !isExpired(s)).length);
 	const passwordCount = $derived(shares.filter((s) => s.has_password).length);
 
@@ -116,7 +113,46 @@
 		void refresh();
 	});
 
-	const cols = 'grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_90px_90px_100px_110px]';
+	const columns: Column<Share>[] = [
+		{ id: 'target', header: 'Target', enableSorting: false },
+		{ id: 'link', header: 'Link', enableSorting: false },
+		{
+			id: 'downloads',
+			accessorKey: 'download_count',
+			header: 'Downloads',
+			align: 'right',
+			enableSorting: true
+		},
+		{
+			id: 'expires',
+			accessorKey: 'expires_at',
+			header: 'Expires',
+			align: 'right',
+			enableSorting: true
+		},
+		{
+			id: 'created',
+			accessorKey: 'created_at',
+			header: 'Created',
+			align: 'right',
+			enableSorting: true
+		},
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
+	];
+
+	const shareTable = createDataTable<Share>({
+		data: () => shares,
+		columns,
+		initialSorting: [{ id: 'created', desc: true }],
+		globalFilterFn: (row, _id, value) => {
+			const v = String(value ?? '').toLowerCase();
+			return v === '' || shareHaystack(row.original).includes(v);
+		}
+	});
+
+	$effect(() => {
+		shareTable.table.setGlobalFilter(q);
+	});
 </script>
 
 <div class="stw-page-pad flex flex-col gap-4">
@@ -153,37 +189,23 @@
 
 	{#if error}
 		<Banner variant="err" role="alert">{error}</Banner>
-	{:else if filtered.length === 0 && shares.length === 0}
+	{:else if shares.length === 0}
 		{#snippet linkIcon()}<LinkIcon size={22} strokeWidth={1.7} />{/snippet}
 		<EmptyState variant="card" icon={linkIcon} title="No shares yet.">
 			<div>
 				Open a file in any bucket and click <strong>Share</strong> to mint a link.
 			</div>
 		</EmptyState>
-	{:else if filtered.length === 0}
-		<EmptyState variant="card" hint={`No shares match "${q}".`} />
 	{:else}
-		<div
-			class="overflow-hidden rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)]"
+		<DataTable
+			table={shareTable.table}
+			emptyText={q ? `No shares match "${q}".` : 'No shares yet.'}
+			rowClass={(r) => (r.original.revoked ? 'opacity-55' : '')}
 		>
-			<div
-				class="grid {cols} gap-2.5 border-b border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.06em] text-[var(--stw-fg-soft)] uppercase"
-			>
-				<span>Target</span>
-				<span>Link</span>
-				<span class="text-right">Downloads</span>
-				<span class="text-right">Expires</span>
-				<span class="text-right">Created</span>
-				<span class="text-right">Actions</span>
-			</div>
-			{#each filtered as s (s.id)}
+			{#snippet row(s)}
 				{@const exp = expiryLabel(s)}
 				{@const url = api.shareURL(s)}
-				<div
-					class="grid {cols} items-center gap-2.5 border-b border-[var(--stw-border)] px-3.5 py-2.5 text-[13px] {s.revoked
-						? 'opacity-55'
-						: ''}"
-				>
+				<td class="min-w-0 px-3">
 					<div class="flex min-w-0 flex-col gap-0.5">
 						<div class="truncate font-mono" title="{s.backend_id}/{s.bucket}/{s.key}">
 							{s.bucket}/{s.key}
@@ -203,41 +225,41 @@
 							{/if}
 						</div>
 					</div>
-					<div
-						class="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-[var(--stw-fg-mute)]"
-					>
-						<span class="min-w-0 flex-1 truncate" title={url}>/s/{s.code}</span>
-					</div>
-					<div class="text-right font-mono">
-						{num(s.download_count)}{#if s.max_downloads}<span class="text-[var(--stw-fg-soft)]"
-								>/{s.max_downloads}</span
-							>{/if}
-					</div>
-					<div
-						class="text-right text-[12px] {exp.tone === 'warn'
-							? 'text-[var(--stw-warn)]'
-							: exp.tone === 'soft'
-								? 'text-[var(--stw-fg-soft)]'
-								: 'text-[var(--stw-fg-mute)]'}"
-					>
-						{exp.text}
-					</div>
-					<div class="text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
-						{new Date(s.created_at).toLocaleDateString()}
-					</div>
-					<div class="flex items-center justify-end gap-1">
-						{#if s.revoked}
-							<Badge>revoked</Badge>
-						{:else}
-							{#snippet copyIcon()}
-								{#if copiedID === s.id}
-									<Check size={13} strokeWidth={1.7} />
-								{:else}
-									<Copy size={13} strokeWidth={1.7} />
-								{/if}
-							{/snippet}
-							{#snippet openIcon()}<ExternalLink size={13} strokeWidth={1.7} />{/snippet}
-							{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
+				</td>
+				<td class="px-3 font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+					<span class="block max-w-[180px] truncate" title={url}>/s/{s.code}</span>
+				</td>
+				<td class="px-3 text-right font-mono">
+					{num(s.download_count)}{#if s.max_downloads}<span class="text-[var(--stw-fg-soft)]"
+							>/{s.max_downloads}</span
+						>{/if}
+				</td>
+				<td
+					class="px-3 text-right text-[12px] {exp.tone === 'warn'
+						? 'text-[var(--stw-warn)]'
+						: exp.tone === 'soft'
+							? 'text-[var(--stw-fg-soft)]'
+							: 'text-[var(--stw-fg-mute)]'}"
+				>
+					{exp.text}
+				</td>
+				<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+					{new Date(s.created_at).toLocaleDateString()}
+				</td>
+				<td class="px-3 text-right">
+					{#if s.revoked}
+						<Badge>revoked</Badge>
+					{:else}
+						{#snippet copyIcon()}
+							{#if copiedID === s.id}
+								<Check size={13} strokeWidth={1.7} />
+							{:else}
+								<Copy size={13} strokeWidth={1.7} />
+							{/if}
+						{/snippet}
+						{#snippet openIcon()}<ExternalLink size={13} strokeWidth={1.7} />{/snippet}
+						{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
+						<span class="inline-flex gap-0.5">
 							<IconButton
 								icon={copyIcon}
 								onclick={() => copyLink(s)}
@@ -256,10 +278,10 @@
 								title="Revoke"
 								label="Revoke share"
 							/>
-						{/if}
-					</div>
-				</div>
-			{/each}
-		</div>
+						</span>
+					{/if}
+				</td>
+			{/snippet}
+		</DataTable>
 	{/if}
 </div>

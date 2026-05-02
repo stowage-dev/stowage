@@ -8,7 +8,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import FilterBar from '$lib/components/ui/FilterBar.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import { DataTable, createDataTable, type Column } from '$lib/components/ui/table';
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { api, ApiException } from '$lib/api';
@@ -100,15 +100,21 @@
 		}
 	}
 
-	const columns = [
-		{ key: 'time', label: 'Time' },
-		{ key: 'action', label: 'Action' },
-		{ key: 'status', label: 'Status' },
-		{ key: 'user', label: 'User' },
-		{ key: 'target', label: 'Target' },
-		{ key: 'detail', label: 'Detail' },
-		{ key: 'ip', label: 'IP' }
+	const columns: Column<AuditEvent>[] = [
+		{ id: 'time', accessorKey: 'timestamp', header: 'Time', enableSorting: true },
+		{ id: 'action', accessorKey: 'action', header: 'Action', enableSorting: true },
+		{ id: 'status', accessorKey: 'status', header: 'Status', enableSorting: true },
+		{ id: 'user', accessorKey: 'user_id', header: 'User', enableSorting: true },
+		{ id: 'target', header: 'Target', enableSorting: false },
+		{ id: 'detail', header: 'Detail', enableSorting: false },
+		{ id: 'ip', accessorKey: 'ip', header: 'IP', enableSorting: true }
 	];
+
+	const auditTable = createDataTable<AuditEvent>({
+		data: () => events,
+		columns,
+		initialSorting: [{ id: 'time', desc: true }]
+	});
 </script>
 
 <div class="stw-page-pad flex flex-col gap-4">
@@ -180,7 +186,7 @@
 		{#snippet auditEmptyIcon()}<Activity size={20} strokeWidth={1.5} />{/snippet}
 		<EmptyState variant="card" icon={auditEmptyIcon} hint="No events match these filters." />
 	{:else}
-		<DataTable {columns} rows={events} rowHeight={36}>
+		<DataTable table={auditTable.table}>
 			{#snippet row(e)}
 				<td
 					class="px-3 py-2 align-top font-mono text-[11.5px] whitespace-nowrap text-[var(--stw-fg-mute)]"

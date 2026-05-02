@@ -23,7 +23,12 @@
 	import StatLine from '$lib/components/ui/StatLine.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import Segmented from '$lib/components/ui/Segmented.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import {
+		DataTable,
+		DataTablePagination,
+		createDataTable,
+		type Column
+	} from '$lib/components/ui/table';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import S3CredentialDrawer from './S3CredentialDrawer.svelte';
 	import S3AnonymousDrawer from './S3AnonymousDrawer.svelte';
@@ -61,21 +66,12 @@
 	const operatorCreds = $derived(creds.filter((c) => c.source === 'kubernetes'));
 	const sqliteCreds = $derived(creds.filter((c) => c.source === 'sqlite'));
 
-	const filteredCreds = $derived(
-		creds.filter((c) => {
-			if (q === '') return true;
-			const hay =
-				`${c.access_key} ${c.backend_id} ${c.buckets.join(' ')} ${c.description ?? ''} ${c.claim_namespace ?? ''} ${c.claim_name ?? ''}`.toLowerCase();
-			return hay.includes(q.toLowerCase());
-		})
-	);
-	const filteredAnon = $derived(
-		bindings.filter((b) => {
-			if (q === '') return true;
-			const hay = `${b.backend_id} ${b.bucket}`.toLowerCase();
-			return hay.includes(q.toLowerCase());
-		})
-	);
+	function credHaystack(c: S3CredentialView): string {
+		return `${c.access_key} ${c.backend_id} ${c.buckets.join(' ')} ${c.description ?? ''} ${c.claim_namespace ?? ''} ${c.claim_name ?? ''}`.toLowerCase();
+	}
+	function anonHaystack(b: S3AnonymousBinding): string {
+		return `${b.backend_id} ${b.bucket}`.toLowerCase();
+	}
 
 	async function refresh(): Promise<void> {
 		busy = true;
@@ -143,25 +139,71 @@
 		return new Date(s).toLocaleDateString();
 	}
 
-	const credColumns = [
-		{ key: 'akid', label: 'Access key' },
-		{ key: 'source', label: 'Source' },
-		{ key: 'backend', label: 'Backend' },
-		{ key: 'buckets', label: 'Buckets' },
-		{ key: 'owner', label: 'Owner' },
-		{ key: 'expires', label: 'Expires', align: 'right' as const },
-		{ key: 'status', label: 'Status', align: 'right' as const },
-		{ key: 'actions', label: '', align: 'right' as const }
+	const credColumns: Column<S3CredentialView>[] = [
+		{ id: 'akid', accessorKey: 'access_key', header: 'Access key', enableSorting: true },
+		{ id: 'source', accessorKey: 'source', header: 'Source', enableSorting: true },
+		{ id: 'backend', accessorKey: 'backend_id', header: 'Backend', enableSorting: true },
+		{ id: 'buckets', header: 'Buckets', enableSorting: false },
+		{ id: 'owner', header: 'Owner', enableSorting: false },
+		{
+			id: 'expires',
+			accessorKey: 'expires_at',
+			header: 'Expires',
+			align: 'right',
+			enableSorting: true
+		},
+		{ id: 'status', accessorKey: 'enabled', header: 'Status', align: 'right', enableSorting: true },
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
 	];
 
-	const anonColumns = [
-		{ key: 'target', label: 'Target' },
-		{ key: 'source', label: 'Source' },
-		{ key: 'mode', label: 'Mode' },
-		{ key: 'rps', label: 'Per-IP RPS', align: 'right' as const },
-		{ key: 'created', label: 'Created', align: 'right' as const },
-		{ key: 'actions', label: '', align: 'right' as const }
+	const anonColumns: Column<S3AnonymousBinding>[] = [
+		{ id: 'target', header: 'Target', enableSorting: false },
+		{ id: 'source', accessorKey: 'source', header: 'Source', enableSorting: true },
+		{ id: 'mode', accessorKey: 'mode', header: 'Mode', enableSorting: true },
+		{
+			id: 'rps',
+			accessorKey: 'per_source_ip_rps',
+			header: 'Per-IP RPS',
+			align: 'right',
+			enableSorting: true
+		},
+		{
+			id: 'created',
+			accessorKey: 'created_at',
+			header: 'Created',
+			align: 'right',
+			enableSorting: true
+		},
+		{ id: 'actions', header: '', align: 'right', enableSorting: false }
 	];
+
+	const credTable = createDataTable<S3CredentialView>({
+		data: () => creds,
+		columns: credColumns,
+		initialSorting: [{ id: 'akid', desc: false }],
+		enablePagination: true,
+		pageSize: 50,
+		globalFilterFn: (row, _id, value) => {
+			const v = String(value ?? '').toLowerCase();
+			return v === '' || credHaystack(row.original).includes(v);
+		}
+	});
+	const anonTable = createDataTable<S3AnonymousBinding>({
+		data: () => bindings,
+		columns: anonColumns,
+		initialSorting: [{ id: 'target', desc: false }],
+		enablePagination: true,
+		pageSize: 50,
+		globalFilterFn: (row, _id, value) => {
+			const v = String(value ?? '').toLowerCase();
+			return v === '' || anonHaystack(row.original).includes(v);
+		}
+	});
+
+	$effect(() => {
+		credTable.table.setGlobalFilter(q);
+		anonTable.table.setGlobalFilter(q);
+	});
 
 	onMount(() => {
 		if (!disabled) void refresh();
@@ -248,7 +290,7 @@
 					</div>
 				</EmptyState>
 			{:else}
-				<DataTable columns={credColumns} rows={filteredCreds} emptyText="No credentials match.">
+				<DataTable table={credTable.table} emptyText="No credentials match.">
 					{#snippet row(c)}
 						<td class="px-3 font-mono text-[12.5px]">{c.access_key}</td>
 						<td class="px-3">
@@ -324,6 +366,9 @@
 						</td>
 					{/snippet}
 				</DataTable>
+				{#if creds.length > 50}
+					<DataTablePagination table={credTable.table} />
+				{/if}
 			{/if}
 		{:else if bindings.length === 0 && !error}
 			{#snippet globeIcon()}<Globe size={22} strokeWidth={1.7} />{/snippet}
@@ -334,7 +379,7 @@
 				</div>
 			</EmptyState>
 		{:else}
-			<DataTable columns={anonColumns} rows={filteredAnon} emptyText="No bindings match.">
+			<DataTable table={anonTable.table} emptyText="No bindings match.">
 				{#snippet row(b)}
 					<td class="px-3 font-mono text-[12.5px]">{b.backend_id}/{b.bucket}</td>
 					<td class="px-3">
@@ -368,6 +413,9 @@
 					</td>
 				{/snippet}
 			</DataTable>
+			{#if bindings.length > 50}
+				<DataTablePagination table={anonTable.table} />
+			{/if}
 		{/if}
 	{/if}
 </div>

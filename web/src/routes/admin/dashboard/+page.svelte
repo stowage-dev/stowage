@@ -7,10 +7,15 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte';
 	import StatCard from '$lib/components/ui/StatCard.svelte';
 	import SectionCard from '$lib/components/ui/SectionCard.svelte';
-	import DataTable from '$lib/components/ui/DataTable.svelte';
+	import { DataTable, createDataTable, type Column } from '$lib/components/ui/table';
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import { bytes, num } from '$lib/format';
 	import { session } from '$lib/stores/session.svelte';
+	import type {
+		DashboardBackendStorage,
+		DashboardErrorEvent,
+		DashboardTopBucket
+	} from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -36,28 +41,43 @@
 		}
 	}
 
-	const storageColumns = [
-		{ key: 'backend', label: 'Backend' },
-		{ key: 'buckets', label: 'Buckets', align: 'right' as const },
-		{ key: 'objects', label: 'Objects', align: 'right' as const },
-		{ key: 'bytes', label: 'Bytes', align: 'right' as const }
+	const storageColumns: Column<DashboardBackendStorage>[] = [
+		{ accessorKey: 'backend_id', header: 'Backend', enableSorting: true },
+		{ accessorKey: 'buckets', header: 'Buckets', align: 'right', mono: true, enableSorting: true },
+		{ accessorKey: 'objects', header: 'Objects', align: 'right', mono: true, enableSorting: true },
+		{ accessorKey: 'bytes', header: 'Bytes', align: 'right', mono: true, enableSorting: true }
 	];
 
-	const topColumns = [
-		{ key: 'backend', label: 'Backend' },
-		{ key: 'bucket', label: 'Bucket' },
-		{ key: 'objects', label: 'Objects', align: 'right' as const },
-		{ key: 'bytes', label: 'Bytes', align: 'right' as const }
+	const topColumns: Column<DashboardTopBucket>[] = [
+		{ accessorKey: 'backend_id', header: 'Backend', enableSorting: true },
+		{ accessorKey: 'bucket', header: 'Bucket', mono: true, enableSorting: true },
+		{ accessorKey: 'objects', header: 'Objects', align: 'right', mono: true, enableSorting: true },
+		{ accessorKey: 'bytes', header: 'Bytes', align: 'right', mono: true, enableSorting: true }
 	];
 
-	const errorColumns = [
-		{ key: 'when', label: 'When' },
-		{ key: 'status', label: 'Status', align: 'right' as const },
-		{ key: 'method', label: 'Method' },
-		{ key: 'path', label: 'Path' },
-		{ key: 'backend', label: 'Backend' },
-		{ key: 'user', label: 'User' }
+	const errorColumns: Column<DashboardErrorEvent>[] = [
+		{ accessorKey: 'when', header: 'When', enableSorting: true },
+		{ accessorKey: 'status', header: 'Status', align: 'right', mono: true, enableSorting: true },
+		{ accessorKey: 'method', header: 'Method' },
+		{ accessorKey: 'path', header: 'Path', mono: true },
+		{ accessorKey: 'backend', header: 'Backend' },
+		{ accessorKey: 'user_id', header: 'User' }
 	];
+
+	const storageTable = createDataTable<DashboardBackendStorage>({
+		data: () => data.dashboard?.storage.by_backend ?? [],
+		columns: storageColumns
+	});
+	const topTable = createDataTable<DashboardTopBucket>({
+		data: () => data.dashboard?.storage.top_buckets ?? [],
+		columns: topColumns,
+		initialSorting: [{ id: 'bytes', desc: true }]
+	});
+	const errorTable = createDataTable<DashboardErrorEvent>({
+		data: () => data.dashboard?.requests.recent_errors ?? [],
+		columns: errorColumns,
+		initialSorting: [{ id: 'when', desc: true }]
+	});
 </script>
 
 <div class="stw-page-pad mx-auto flex max-w-[1100px] flex-col gap-[18px]">
@@ -169,12 +189,7 @@
 			{#if d.storage.cache_note}
 				<p class="m-0 mb-2 text-[11.5px] text-[var(--stw-fg-soft)]">{d.storage.cache_note}</p>
 			{/if}
-			<DataTable
-				columns={storageColumns}
-				rows={d.storage.by_backend}
-				emptyText="No tracked buckets yet."
-				rowHeight={34}
-			>
+			<DataTable table={storageTable.table} density="compact" emptyText="No tracked buckets yet.">
 				{#snippet row(r)}
 					<td class="px-3">{r.backend_id}</td>
 					<td class="px-3 text-right font-mono">{num(r.buckets)}</td>
@@ -187,10 +202,9 @@
 		<SectionCard title="Top buckets by size">
 			{#snippet icon()}<Database size={14} strokeWidth={1.7} />{/snippet}
 			<DataTable
-				columns={topColumns}
-				rows={d.storage.top_buckets}
+				table={topTable.table}
+				density="compact"
 				emptyText="No data — set quotas on buckets to populate."
-				rowHeight={34}
 			>
 				{#snippet row(r)}
 					<td class="px-3">{r.backend_id}</td>
@@ -203,12 +217,7 @@
 
 		<SectionCard title="Recent errors">
 			{#snippet icon()}<AlertTriangle size={14} strokeWidth={1.7} />{/snippet}
-			<DataTable
-				columns={errorColumns}
-				rows={d.requests.recent_errors}
-				emptyText="No recent server errors. 🎉"
-				rowHeight={32}
-			>
+			<DataTable table={errorTable.table} density="compact" emptyText="No recent server errors. 🎉">
 				{#snippet row(e)}
 					<td class="px-3 text-[11.5px] text-[var(--stw-fg-soft)]">
 						{new Date(e.when).toLocaleTimeString()}
