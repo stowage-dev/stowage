@@ -196,7 +196,7 @@
 					onnavigate={navigateCrumb}
 					onmenu={toggleSidebar}
 				/>
-				<div class="stw-scroll relative min-h-0 flex-1 overflow-auto">
+				<div class="relative stw-scroll min-h-0 flex-1 overflow-auto">
 					{@render children()}
 				</div>
 				{#if tweaks.showUploadQueue}

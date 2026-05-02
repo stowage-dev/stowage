@@ -83,9 +83,9 @@
 	}
 
 	function statusToneCls(s: string): string {
-		if (s === 'error') return 'text-[var(--stw-err)]';
-		if (s === 'denied') return 'text-[var(--stw-warn)]';
-		return 'text-[var(--stw-ok)]';
+		if (s === 'error') return 'text-stw-err';
+		if (s === 'denied') return 'text-stw-warn';
+		return 'text-stw-ok';
 	}
 
 	function prettyDetail(s?: string): string {
@@ -111,7 +111,7 @@
 	];
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader
 		title="Audit log"
 		subtitle="{total.toLocaleString('en-US')} events total · showing {events.length} most recent"
@@ -182,14 +182,10 @@
 	{:else}
 		<DataTable {columns} rows={events} rowHeight={36}>
 			{#snippet row(e)}
-				<td
-					class="px-3 py-2 align-top font-mono text-[11.5px] whitespace-nowrap text-[var(--stw-fg-mute)]"
-				>
+				<td class="px-3 py-2 align-top font-mono text-[11.5px] whitespace-nowrap text-stw-fg-mute">
 					{new Date(e.timestamp).toLocaleString()}
 				</td>
-				<td
-					class="px-3 py-2 align-top font-mono text-[12.5px] whitespace-nowrap text-[var(--stw-fg)]"
-				>
+				<td class="px-3 py-2 align-top font-mono text-[12.5px] whitespace-nowrap text-stw-fg">
 					{e.action}
 				</td>
 				<td class="px-3 py-2 align-top">
@@ -198,23 +194,23 @@
 				<td class="px-3 py-2 align-top">{e.user_id ?? '—'}</td>
 				<td class="max-w-[280px] truncate px-3 py-2 align-top font-mono text-[11.5px]">
 					{#if e.backend}
-						<span class="text-[var(--stw-fg-soft)]">{e.backend}</span>
+						<span class="text-stw-fg-soft">{e.backend}</span>
 					{/if}
 					{#if e.bucket}
 						<span>/{e.bucket}</span>
 					{/if}
 					{#if e.key}
-						<span class="text-[var(--stw-fg-mute)]">/{e.key}</span>
+						<span class="text-stw-fg-mute">/{e.key}</span>
 					{/if}
 					{#if !e.backend && !e.bucket && !e.key}—{/if}
 				</td>
 				<td
-					class="max-w-[320px] truncate px-3 py-2 align-top font-mono text-[11px] text-[var(--stw-fg-soft)]"
+					class="max-w-[320px] truncate px-3 py-2 align-top font-mono text-[11px] text-stw-fg-soft"
 					title={e.detail ?? ''}
 				>
 					{prettyDetail(e.detail)}
 				</td>
-				<td class="px-3 py-2 align-top font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+				<td class="px-3 py-2 align-top font-mono text-[11.5px] text-stw-fg-mute">
 					{e.ip ?? '—'}
 				</td>
 			{/snippet}

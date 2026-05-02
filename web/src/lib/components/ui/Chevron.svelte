@@ -12,11 +12,13 @@
 
 	let { size = 16, dir = 'right' }: Props = $props();
 
-	const rot = $derived({ right: 0, down: 90, up: -90, left: 180 }[dir]);
+	const rotCls = $derived(
+		{ right: 'rotate-0', down: 'rotate-90', up: '-rotate-90', left: 'rotate-180' }[dir]
+	);
 </script>
 
 <span
-	style="display:inline-flex;align-items:center;justify-content:center;transform:rotate({rot}deg);transition:transform 120ms;"
+	class="inline-flex items-center justify-center transition-transform duration-[120ms] {rotCls}"
 >
 	<ChevronRight {size} strokeWidth={1.7} />
 </span>

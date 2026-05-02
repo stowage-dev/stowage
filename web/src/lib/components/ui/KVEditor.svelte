@@ -52,7 +52,7 @@
 				onclick={() => removeRow(i)}
 				aria-label="Remove row"
 				{disabled}
-				class="stw-focus inline-flex h-[26px] w-[26px] flex-shrink-0 cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+				class="inline-flex h-[26px] w-[26px] flex-shrink-0 cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-stw-fg-mute focus-ring hover:bg-stw-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				<X size={12} strokeWidth={1.7} />
 			</button>
@@ -62,7 +62,7 @@
 		type="button"
 		onclick={addRow}
 		{disabled}
-		class="stw-focus inline-flex cursor-pointer items-center gap-1 self-start rounded-[5px] border border-dashed border-[var(--stw-border)] bg-transparent px-2 py-1 text-[11.5px] text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+		class="inline-flex cursor-pointer items-center gap-1 self-start rounded-[5px] border border-dashed border-stw-border bg-transparent px-2 py-1 text-[11.5px] text-stw-fg-mute focus-ring hover:bg-stw-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
 	>
 		<Plus size={11} strokeWidth={1.7} />
 		{computedAddLabel}

@@ -15,7 +15,7 @@
 
 <button
 	type="button"
-	class="stw-chip stw-focus"
+	class="stw-chip focus-ring"
 	aria-pressed={pressed ? 'true' : 'false'}
 	{onclick}
 >

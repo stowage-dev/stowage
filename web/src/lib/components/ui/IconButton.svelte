@@ -14,11 +14,14 @@
 
 	let { label, icon, onclick, active = false, title, size = 28 }: Props = $props();
 
-	let hovered = $state(false);
-
-	const bg = $derived(active || hovered ? 'var(--stw-bg-hover)' : 'transparent');
-	const color = $derived(active || hovered ? 'var(--stw-fg)' : 'var(--stw-fg-mute)');
-	const border = $derived(active ? 'var(--stw-border)' : 'transparent');
+	const base =
+		'focus-ring inline-flex cursor-pointer items-center justify-center rounded-stw-md p-0 ' +
+		'border transition-[background,color] duration-[120ms]';
+	const stateCls = $derived(
+		active
+			? 'border-stw-border bg-stw-bg-hover text-stw-fg'
+			: 'border-transparent bg-transparent text-stw-fg-mute hover:border-transparent hover:bg-stw-bg-hover hover:text-stw-fg'
+	);
 </script>
 
 <button
@@ -26,10 +29,8 @@
 	{onclick}
 	title={title || label}
 	aria-label={label}
-	class="stw-focus"
-	style="display:inline-flex;align-items:center;justify-content:center;width:{size}px;height:{size}px;padding:0;background:{bg};border:1px solid {border};border-radius:6px;color:{color};cursor:pointer;transition:background 120ms,color 120ms;"
-	onmouseenter={() => (hovered = true)}
-	onmouseleave={() => (hovered = false)}
+	class="{base} {stateCls}"
+	style="width:{size}px;height:{size}px;"
 >
 	{@render icon()}
 </button>
