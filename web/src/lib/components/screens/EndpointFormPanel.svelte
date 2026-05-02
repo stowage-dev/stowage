@@ -150,7 +150,7 @@
 			/>
 			{#snippet hint()}{/snippet}
 		</FormField>
-		<div class="-mt-2 text-[11.5px] text-[var(--stw-fg-soft)]">
+		<div class="-mt-2 text-[11.5px] text-stw-fg-soft">
 			Append <code>:PORT</code> for nonstandard ports (e.g. <code>:9000</code> for MinIO,
 			<code>:3900</code> for Garage). No path, query, or fragment.
 		</div>
@@ -178,7 +178,7 @@
 				{/if}
 			{/snippet}
 			{#if editing}
-				<label class="inline-flex items-center gap-2 text-[13px] text-[var(--stw-fg-mute)]">
+				<label class="inline-flex items-center gap-2 text-[13px] text-stw-fg-mute">
 					<input type="checkbox" bind:checked={replaceSecret} />
 					Replace secret
 				</label>
@@ -205,12 +205,12 @@
 			</Button>
 			{#if testResult}
 				{#if testResult.healthy}
-					<span class="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--stw-ok)]">
+					<span class="inline-flex items-center gap-1.5 text-[12.5px] text-stw-ok">
 						<CheckCircle2 size={14} strokeWidth={1.8} />
 						Reachable · {testResult.latency_ms} ms
 					</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--stw-err)]">
+					<span class="inline-flex items-center gap-1.5 text-[12.5px] text-stw-err">
 						<XCircle size={14} strokeWidth={1.8} />
 						{testResult.error ?? 'Unreachable'}
 					</span>

@@ -214,10 +214,8 @@
 	trailing: import('svelte').Snippet | null
 )}
 	<div class="mb-2 flex items-center gap-2">
-		<span class="inline-flex text-[var(--stw-fg-soft)]">{@render icon()}</span>
-		<div
-			class="flex-1 text-[10.5px] font-semibold tracking-[0.08em] text-[var(--stw-fg-soft)] uppercase"
-		>
+		<span class="inline-flex text-stw-fg-soft">{@render icon()}</span>
+		<div class="flex-1 text-[10.5px] font-semibold tracking-[0.08em] text-stw-fg-soft uppercase">
 			{label}
 		</div>
 		{#if trailing}{@render trailing()}{/if}
@@ -228,16 +226,15 @@
 <div
 	role="dialog"
 	aria-label="Object details"
-	class="absolute top-0 right-0 bottom-0 z-[2] flex max-w-full animate-[stw-slide-in-right_180ms_cubic-bezier(0.4,0,0.2,1)] flex-col border-l border-[var(--stw-border)] bg-[var(--stw-bg-panel)] shadow-[var(--stw-shadow-lg)]"
-	style="width:min(560px, max(70vw, 320px));"
+	class="absolute top-0 right-0 bottom-0 z-[2] flex w-[min(560px,max(70vw,320px))] max-w-full animate-[stw-slide-in-right_180ms_cubic-bezier(0.4,0,0.2,1)] flex-col border-l border-stw-border bg-stw-bg-panel shadow-stw-lg"
 >
-	<header class="flex h-[44px] items-center gap-2 border-b border-[var(--stw-border)] px-3.5">
+	<header class="flex h-[44px] items-center gap-2 border-b border-stw-border px-3.5">
 		<ObjectIcon kind={item.kind} />
 		<span class="flex-1 truncate text-[13px] font-semibold">{item.displayName}</span>
 		<button
 			type="button"
 			onclick={onclose}
-			class="stw-focus inline-flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)]"
+			class="inline-flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-stw-fg-mute focus-ring hover:bg-stw-bg-hover"
 			aria-label="Close"
 		>
 			<X size={14} strokeWidth={1.7} />
@@ -248,25 +245,25 @@
 		<Preview {item} {backend} {bucket} {prefix} />
 
 		<section class="px-3.5 pb-3.5">
-			<div class="grid gap-x-3 gap-y-1.5 text-[12px]" style="grid-template-columns:100px 1fr;">
-				<span class="text-[var(--stw-fg-mute)]">Size</span>
+			<div class="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[12px]">
+				<span class="text-stw-fg-mute">Size</span>
 				<span class="font-mono">{bytes(item.size)}</span>
-				<span class="text-[var(--stw-fg-mute)]">Modified</span>
+				<span class="text-stw-fg-mute">Modified</span>
 				<span class="font-mono">
 					{item.modified ? new Date(item.modified).toLocaleString() : '—'}
 				</span>
-				<span class="text-[var(--stw-fg-mute)]">Type</span>
+				<span class="text-stw-fg-mute">Type</span>
 				<span class="font-mono">{item.ct ?? '—'}</span>
 				{#if item.etag}
 					{@const etag = item.etag}
-					<span class="text-[var(--stw-fg-mute)]">ETag</span>
+					<span class="text-stw-fg-mute">ETag</span>
 					<span>
 						<CopyChip value={etag}>
 							{middleEllipsis(etag.replaceAll('"', ''), 20)}
 						</CopyChip>
 					</span>
 				{/if}
-				<span class="text-[var(--stw-fg-mute)]">Key</span>
+				<span class="text-stw-fg-mute">Key</span>
 				<span>
 					<CopyChip value={fullKey}>
 						{middleEllipsis(fullKey, 40)}
@@ -275,14 +272,14 @@
 			</div>
 		</section>
 
-		<section class="border-t border-[var(--stw-border)] px-3.5 py-2.5">
+		<section class="border-t border-stw-border px-3.5 py-2.5">
 			{#snippet metaHeaderIcon()}<Pencil size={12} strokeWidth={1.7} />{/snippet}
 			{#snippet metaHeaderAction()}
 				{#if canEdit && !editingMetadata}
 					<button
 						type="button"
 						onclick={startEditMetadata}
-						class="stw-focus cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[11.5px] text-[var(--stw-accent-600)] hover:underline"
+						class="cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[11.5px] text-stw-accent-600 focus-ring hover:underline"
 					>
 						Edit
 					</button>
@@ -291,9 +288,9 @@
 			{@render sectionHeader('User metadata', metaHeaderIcon, metaHeaderAction)}
 
 			{#if metadataLoading}
-				<div class="text-[12px] text-[var(--stw-fg-soft)]">Loading…</div>
+				<div class="text-[12px] text-stw-fg-soft">Loading…</div>
 			{:else if metadataError}
-				<div class="text-[12px] text-[var(--stw-err)]">{metadataError}</div>
+				<div class="text-[12px] text-stw-err">{metadataError}</div>
 			{:else if editingMetadata}
 				<KVEditor bind:rows={metadataRows} keyPlaceholder="x-amz-meta-…" valuePlaceholder="value" />
 				<div class="mt-2.5 flex items-center gap-1.5">
@@ -308,61 +305,59 @@
 					>
 						Cancel
 					</Button>
-					<span class="flex-1 self-center text-[11px] text-[var(--stw-fg-soft)]">
+					<span class="flex-1 self-center text-[11px] text-stw-fg-soft">
 						Saving rewrites the object in place (new version on versioned buckets).
 					</span>
 				</div>
 			{:else if Object.keys(metadata ?? {}).length === 0}
-				<div class="text-[12px] text-[var(--stw-fg-mute)]">No user metadata.</div>
+				<div class="text-[12px] text-stw-fg-mute">No user metadata.</div>
 			{:else}
 				<KVChips entries={metadata ?? {}} />
 			{/if}
 		</section>
 
 		{#if capabilities.versioning}
-			<section class="border-t border-[var(--stw-border)] px-3.5 py-2.5">
+			<section class="border-t border-stw-border px-3.5 py-2.5">
 				{#snippet versionsHeaderIcon()}<History size={12} strokeWidth={1.7} />{/snippet}
 				{@render sectionHeader('Versions', versionsHeaderIcon, null)}
 				{#if versionsLoading}
-					<div class="text-[12px] text-[var(--stw-fg-soft)]">Loading…</div>
+					<div class="text-[12px] text-stw-fg-soft">Loading…</div>
 				{:else if versionsError}
-					<div class="text-[12px] text-[var(--stw-err)]">{versionsError}</div>
+					<div class="text-[12px] text-stw-err">{versionsError}</div>
 				{:else if (versions ?? []).length === 0}
-					<div class="text-[12px] text-[var(--stw-fg-mute)]">No versions recorded.</div>
+					<div class="text-[12px] text-stw-fg-mute">No versions recorded.</div>
 				{:else}
 					<div class="flex flex-col gap-1">
 						{#each versions ?? [] as v (v.version_id || v.last_modified)}
 							<div
-								class="flex items-center gap-2 rounded-md border border-[var(--stw-border)] px-2 py-1.5 text-[12px] {v.is_latest
-									? 'bg-[var(--stw-bg-panel)]'
-									: 'bg-[var(--stw-bg-sunken)]'}"
+								class="flex items-center gap-2 rounded-md border border-stw-border px-2 py-1.5 text-[12px] {v.is_latest
+									? 'bg-stw-bg-panel'
+									: 'bg-stw-bg-sunken'}"
 							>
 								{#if v.is_latest}
 									<span
-										class="inline-flex flex-shrink-0 items-center rounded px-1.5 py-px text-[10.5px] font-semibold tracking-[0.04em] text-[var(--stw-accent-600)]"
-										style="background:color-mix(in oklch, var(--stw-accent-500) 18%, var(--stw-bg-panel));"
+										class="inline-flex flex-shrink-0 items-center rounded px-1.5 py-px text-[10.5px] font-semibold tracking-[0.04em] text-stw-accent-600 stw-version-current"
 									>
 										LATEST
 									</span>
 								{/if}
 								{#if v.is_delete_marker}
 									<span
-										class="inline-flex flex-shrink-0 items-center rounded px-1.5 py-px text-[10.5px] font-semibold tracking-[0.04em] text-[var(--stw-err)]"
-										style="background:color-mix(in oklch, var(--stw-err) 15%, var(--stw-bg-panel));"
+										class="inline-flex flex-shrink-0 items-center rounded px-1.5 py-px text-[10.5px] font-semibold tracking-[0.04em] text-stw-err stw-version-deleted"
 									>
 										DELETED
 									</span>
 								{/if}
 								<span
-									class="min-w-0 flex-1 truncate font-mono text-[var(--stw-fg-soft)]"
+									class="min-w-0 flex-1 truncate font-mono text-stw-fg-soft"
 									title={v.version_id}
 								>
 									{v.version_id ? middleEllipsis(v.version_id, 24) : '(no version id)'}
 								</span>
-								<span class="flex-shrink-0 font-mono text-[var(--stw-fg-mute)]">
+								<span class="flex-shrink-0 font-mono text-stw-fg-mute">
 									{v.is_delete_marker ? '—' : bytes(v.size)}
 								</span>
-								<span class="flex-shrink-0 font-mono text-[11px] text-[var(--stw-fg-mute)]">
+								<span class="flex-shrink-0 font-mono text-[11px] text-stw-fg-mute">
 									{v.last_modified ? new Date(v.last_modified).toLocaleDateString() : '—'}
 								</span>
 								{#if !v.is_delete_marker}
@@ -370,7 +365,7 @@
 										type="button"
 										onclick={() => downloadVersion(v)}
 										aria-label="Download this version"
-										class="stw-focus inline-flex h-[24px] w-[24px] flex-shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)]"
+										class="inline-flex h-[24px] w-[24px] flex-shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent text-stw-fg-mute focus-ring hover:bg-stw-bg-hover"
 									>
 										<Download size={12} strokeWidth={1.7} />
 									</button>
@@ -383,14 +378,14 @@
 		{/if}
 
 		{#if capabilities.tagging}
-			<section class="border-t border-[var(--stw-border)] px-3.5 py-2.5">
+			<section class="border-t border-stw-border px-3.5 py-2.5">
 				{#snippet tagHeaderIcon()}<Tag size={12} strokeWidth={1.7} />{/snippet}
 				{#snippet tagHeaderAction()}
 					{#if canEdit && !editingTags}
 						<button
 							type="button"
 							onclick={startEditTags}
-							class="stw-focus cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[11.5px] text-[var(--stw-accent-600)] hover:underline"
+							class="cursor-pointer border-0 bg-transparent px-1 py-0.5 text-[11.5px] text-stw-accent-600 focus-ring hover:underline"
 						>
 							Edit
 						</button>
@@ -399,9 +394,9 @@
 				{@render sectionHeader('Tags', tagHeaderIcon, tagHeaderAction)}
 
 				{#if tagsLoading}
-					<div class="text-[12px] text-[var(--stw-fg-soft)]">Loading…</div>
+					<div class="text-[12px] text-stw-fg-soft">Loading…</div>
 				{:else if tagsError}
-					<div class="text-[12px] text-[var(--stw-err)]">{tagsError}</div>
+					<div class="text-[12px] text-stw-err">{tagsError}</div>
 				{:else if editingTags}
 					<KVEditor bind:rows={tagRows} keyPlaceholder="key" valuePlaceholder="value" />
 					<div class="mt-2.5 flex items-center gap-1.5">
@@ -416,12 +411,12 @@
 						>
 							Cancel
 						</Button>
-						<span class="flex-1 self-center text-[11px] text-[var(--stw-fg-soft)]">
+						<span class="flex-1 self-center text-[11px] text-stw-fg-soft">
 							Up to 10 tags. Keys ≤ 128, values ≤ 256.
 						</span>
 					</div>
 				{:else if Object.keys(tags ?? {}).length === 0}
-					<div class="text-[12px] text-[var(--stw-fg-mute)]">No tags.</div>
+					<div class="text-[12px] text-stw-fg-mute">No tags.</div>
 				{:else}
 					<KVChips entries={tags ?? {}} />
 				{/if}
@@ -429,7 +424,7 @@
 		{/if}
 	</div>
 
-	<footer class="flex gap-2 border-t border-[var(--stw-border)] p-3">
+	<footer class="flex gap-2 border-t border-stw-border p-3">
 		{#snippet shareIcon()}<Share2 size={13} strokeWidth={1.7} />{/snippet}
 		{#snippet downloadIcon()}<Download size={13} strokeWidth={1.7} />{/snippet}
 		{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}

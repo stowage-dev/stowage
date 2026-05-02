@@ -135,7 +135,7 @@
 			</FormField>
 
 			<FormField label="Scope">
-				<div class="text-[12.5px] text-[var(--stw-fg-mute)]">
+				<div class="text-[12.5px] text-stw-fg-mute">
 					{created.backend_id} · {created.buckets.join(', ')}
 				</div>
 			</FormField>

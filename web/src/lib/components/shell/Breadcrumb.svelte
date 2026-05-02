@@ -21,16 +21,16 @@
 	{#each crumbs as c, i (i)}
 		{@const last = i === crumbs.length - 1}
 		{#if i > 0}
-			<span class="inline-flex items-center px-1 text-[var(--stw-fg-soft)]">
+			<span class="inline-flex items-center px-1 text-stw-fg-soft">
 				<Chevron size={10} dir="right" />
 			</span>
 		{/if}
 		<button
 			type="button"
 			onclick={() => !last && onnavigate?.(c, i)}
-			class="stw-focus inline-flex h-[24px] max-w-[200px] items-center gap-1.5 truncate rounded border-0 bg-transparent px-1.5 text-[13px] {last
-				? 'cursor-default font-medium text-[var(--stw-fg)]'
-				: 'cursor-pointer font-normal text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)] hover:text-[var(--stw-fg)]'} {c.mono
+			class="inline-flex h-[24px] max-w-[200px] items-center gap-1.5 truncate rounded border-0 bg-transparent px-1.5 text-[13px] focus-ring {last
+				? 'cursor-default font-medium text-stw-fg'
+				: 'cursor-pointer font-normal text-stw-fg-mute hover:bg-stw-bg-hover hover:text-stw-fg'} {c.mono
 				? 'font-mono'
 				: ''}"
 		>

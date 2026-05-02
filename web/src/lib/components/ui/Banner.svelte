@@ -28,29 +28,22 @@
 		role = 'note'
 	}: Props = $props();
 
-	const tokenBase = $derived(
+	const variantCls = $derived(
 		variant === 'err'
-			? '--stw-err'
+			? 'stw-banner-err'
 			: variant === 'warn'
-				? '--stw-warn'
+				? 'stw-banner-warn'
 				: variant === 'ok'
-					? '--stw-ok'
-					: '--stw-accent-500'
-	);
-
-	const bgStyle = $derived(
-		`background:color-mix(in oklch, var(${tokenBase}) 10%, var(--stw-bg-panel));` +
-			`border:1px solid color-mix(in oklch, var(${tokenBase}) 35%, var(--stw-border));` +
-			`color:var(${tokenBase === '--stw-accent-500' ? '--stw-fg' : tokenBase});`
+					? 'stw-banner-ok'
+					: 'stw-banner-info'
 	);
 </script>
 
 <div
 	{role}
-	class="flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-[13px] leading-[1.5]"
-	style={bgStyle}
+	class="flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-[13px] leading-[1.5] {variantCls}"
 >
-	<span class="mt-[1px] inline-flex flex-shrink-0 items-center justify-center">
+	<span class="mt-[1px] inline-flex shrink-0 items-center justify-center">
 		{#if icon}
 			{@render icon()}
 		{:else if variant === 'err'}
@@ -79,7 +72,7 @@
 			type="button"
 			onclick={ondismiss}
 			aria-label="Dismiss"
-			class="stw-focus inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded border-0 bg-transparent text-current opacity-70 hover:opacity-100"
+			class="inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded border-0 bg-transparent text-current opacity-70 focus-ring hover:opacity-100"
 		>
 			<X size={13} strokeWidth={1.8} />
 		</button>

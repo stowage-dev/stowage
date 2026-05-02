@@ -168,7 +168,7 @@
 	});
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader title="S3 Proxy">
 		{#snippet meta()}
 			<StatLine
@@ -268,23 +268,21 @@
 								</Badge>
 							{/if}
 						</td>
-						<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">{c.backend_id}</td>
+						<td class="px-3 font-mono text-[12px] text-stw-fg-mute">{c.backend_id}</td>
 						<td class="px-3">
 							<div class="flex max-w-[260px] flex-wrap gap-1">
 								{#each c.buckets.slice(0, 3) as b (b)}
 									<span
-										class="rounded bg-[var(--stw-bg-hover)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--stw-fg-mute)]"
+										class="rounded bg-stw-bg-hover px-1.5 py-0.5 font-mono text-[11px] text-stw-fg-mute"
 										>{b}</span
 									>
 								{/each}
 								{#if c.buckets.length > 3}
-									<span class="text-[11px] text-[var(--stw-fg-soft)]"
-										>+{c.buckets.length - 3} more</span
-									>
+									<span class="text-[11px] text-stw-fg-soft">+{c.buckets.length - 3} more</span>
 								{/if}
 							</div>
 						</td>
-						<td class="px-3 text-[12px] text-[var(--stw-fg-mute)]">
+						<td class="px-3 text-[12px] text-stw-fg-mute">
 							{#if c.source === 'kubernetes'}
 								<span class="font-mono text-[11.5px]"
 									>{c.claim_namespace ?? '?'}/{c.claim_name ?? '?'}</span
@@ -295,7 +293,7 @@
 								—
 							{/if}
 						</td>
-						<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-mute)]">
+						<td class="px-3 text-right font-mono text-[11.5px] text-stw-fg-mute">
 							{expiresLabel(c.expires_at)}
 						</td>
 						<td class="px-3 text-right">
@@ -319,7 +317,7 @@
 									/>
 								</Tooltip>
 							{:else}
-								<span class="text-[11px] text-[var(--stw-fg-soft)]">read-only</span>
+								<span class="text-[11px] text-stw-fg-soft">read-only</span>
 							{/if}
 						</td>
 					{/snippet}
@@ -345,10 +343,10 @@
 						{/if}
 					</td>
 					<td class="px-3"><Badge>{b.mode}</Badge></td>
-					<td class="px-3 text-right font-mono text-[12px] text-[var(--stw-fg-mute)]">
+					<td class="px-3 text-right font-mono text-[12px] text-stw-fg-mute">
 						{b.per_source_ip_rps}
 					</td>
-					<td class="px-3 text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+					<td class="px-3 text-right font-mono text-[11.5px] text-stw-fg-soft">
 						{b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'}
 					</td>
 					<td class="px-3 text-right">
@@ -363,7 +361,7 @@
 								/>
 							</Tooltip>
 						{:else}
-							<span class="text-[11px] text-[var(--stw-fg-soft)]">read-only</span>
+							<span class="text-[11px] text-stw-fg-soft">read-only</span>
 						{/if}
 					</td>
 				{/snippet}

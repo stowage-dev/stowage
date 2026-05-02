@@ -106,16 +106,13 @@
 		if (el) el.indeterminate = selected.length > 0 && selected.length < items.length;
 	}
 
-	const headThCls =
-		'text-left text-[11.5px] font-medium tracking-[0.02em] text-[var(--stw-fg-mute)]';
+	const headThCls = 'text-left text-[11.5px] font-medium tracking-[0.02em] text-stw-fg-mute';
 </script>
 
-<div class="stw-scroll flex-1 overflow-auto bg-[var(--stw-bg-panel)]">
+<div class="stw-scroll flex-1 overflow-auto bg-stw-bg-panel">
 	<table class="w-full border-separate border-spacing-0 text-[13px]">
 		<thead>
-			<tr
-				class="sticky top-0 z-[1] h-[30px] bg-[var(--stw-bg-panel)] shadow-[inset_0_-1px_0_var(--stw-border)]"
-			>
+			<tr class="sticky top-0 z-[1] h-[30px] bg-stw-bg-panel row-divider">
 				<th class="w-[32px] {cellPadLCls} text-left align-middle">
 					<input
 						type="checkbox"
@@ -137,9 +134,9 @@
 			{#each items as o (o.key)}
 				{@const sel = selected.includes(o.key)}
 				<tr
-					class="group cursor-pointer shadow-[inset_0_-1px_0_var(--stw-border)] {rowHCls} {sel
-						? 'bg-[var(--stw-bg-sel)]'
-						: 'hover:bg-[var(--stw-bg-hover)]'}"
+					class="group cursor-pointer row-divider {rowHCls} {sel
+						? 'bg-stw-bg-sel'
+						: 'hover:bg-stw-bg-hover'}"
 					onclick={(e) => onRowClick(o.key, e)}
 					ondblclick={() => (o.kind === 'folder' ? onopen(o) : onpreview(o))}
 				>
@@ -170,7 +167,7 @@
 										else onpreview(o);
 									}
 								}}
-								class="cursor-pointer text-[var(--stw-fg)] {o.kind === 'folder'
+								class="cursor-pointer text-stw-fg {o.kind === 'folder'
 									? 'font-medium'
 									: 'font-normal'}"
 							>
@@ -178,15 +175,13 @@
 							</span>
 						</span>
 					</td>
-					<td
-						class="{cellPadCls} text-right font-mono text-[12px] text-[var(--stw-fg-mute)] tabular-nums"
-					>
+					<td class="{cellPadCls} text-right font-mono text-[12px] text-stw-fg-mute tabular-nums">
 						{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
 					</td>
-					<td class="{cellPadCls} font-mono text-[12px] text-[var(--stw-fg-mute)]">
+					<td class="{cellPadCls} font-mono text-[12px] text-stw-fg-mute">
 						{o.modified ? new Date(o.modified).toLocaleString() : '—'}
 					</td>
-					<td class="{cellPadCls} font-mono text-[12px] text-[var(--stw-fg-mute)]">
+					<td class="{cellPadCls} font-mono text-[12px] text-stw-fg-mute">
 						{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
 					</td>
 					<td class="{cellPadCls} text-right" onclick={(e) => e.stopPropagation()}>

@@ -18,19 +18,15 @@
 
 	let { value, onchange, options, size = 'md' }: Props = $props();
 
-	const h = $derived(size === 'sm' ? 24 : 28);
+	const groupCls = $derived(
+		size === 'sm'
+			? 'inline-flex h-6 gap-0 rounded-[7px] border border-stw-border bg-stw-bg-sunken p-0.5'
+			: 'inline-flex h-7 gap-0 rounded-[7px] border border-stw-border bg-stw-bg-sunken p-0.5'
+	);
+	const itemHCls = $derived(size === 'sm' ? 'h-[19px]' : 'h-[23px]');
 </script>
 
-<div
-	role="radiogroup"
-	style="display:inline-flex;
-        padding:2px;
-        gap:0;
-        background:var(--stw-bg-sunken);
-        border:1px solid var(--stw-border);
-        border-radius:7px;
-        height:{h}px;"
->
+<div role="radiogroup" class={groupCls}>
 	{#each options as opt (opt.value)}
 		{@const active = opt.value === value}
 		<button
@@ -38,18 +34,9 @@
 			role="radio"
 			aria-checked={active}
 			onclick={() => onchange(opt.value)}
-			class="stw-focus"
-			style="display:inline-flex;
-                align-items:center;
-                gap:4px;padding:0 10px;
-                height:{h - 5}px;
-                font-size:12px;
-                font-weight:500;
-                background:{active ? 'var(--stw-bg-panel)' : 'transparent'};color:{active
-				? 'var(--stw-fg)'
-				: 'var(--stw-fg-mute)'};border:0;border-radius:5px;box-shadow:{active
-				? 'var(--stw-shadow-xs)'
-				: 'none'};cursor:pointer;"
+			class="inline-flex focus-ring {itemHCls} cursor-pointer items-center gap-1 rounded-[5px] border-0 px-2.5 text-[12px] font-medium {active
+				? 'bg-stw-bg-panel text-stw-fg shadow-stw-xs'
+				: 'bg-transparent text-stw-fg-mute'}"
 		>
 			{#if opt.icon}{@render opt.icon()}{/if}
 			{opt.label}

@@ -222,7 +222,7 @@
 					{ value: 'copy' as const, label: 'Copy' }
 				]}
 			/>
-			<span class="text-[11.5px] text-[var(--stw-fg-soft)]">
+			<span class="text-[11.5px] text-stw-fg-soft">
 				{operation === 'move'
 					? 'Copies to destination, then deletes sources.'
 					: 'Copies to destination; sources remain.'}
@@ -241,7 +241,7 @@
 
 		<FormField label="Destination bucket" error={bucketsError ?? undefined}>
 			{#if buckets === null && !bucketsError}
-				<div class="text-[12px] text-[var(--stw-fg-soft)]">Loading buckets…</div>
+				<div class="text-[12px] text-stw-fg-soft">Loading buckets…</div>
 			{:else if buckets}
 				<select bind:value={dstBucket} disabled={running} class="stw-input font-mono">
 					{#each buckets as b (b.name)}
@@ -265,12 +265,12 @@
 		</FormField>
 
 		<div
-			class="flex items-center gap-2 rounded-md border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-3 py-2.5 font-mono text-[12px]"
+			class="flex items-center gap-2 rounded-md border border-stw-border bg-stw-bg-sunken px-3 py-2.5 font-mono text-[12px]"
 		>
-			<span class="min-w-0 flex-1 truncate text-[var(--stw-fg-soft)]">
+			<span class="min-w-0 flex-1 truncate text-stw-fg-soft">
 				{backendId}/{srcBucket}/{srcPrefix || '(root)'}
 			</span>
-			<ArrowRight size={12} strokeWidth={1.7} class="flex-shrink-0 text-[var(--stw-fg-mute)]" />
+			<ArrowRight size={12} strokeWidth={1.7} class="flex-shrink-0 text-stw-fg-mute" />
 			<span class="min-w-0 flex-1 truncate">
 				{dstBackendId}/{dstBucket}/{normalizedDst || '(root)'}
 			</span>
@@ -291,7 +291,7 @@
 
 		{#if folderCount > 0}
 			<div
-				class="rounded-md border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-3 py-2 text-[11.5px] text-[var(--stw-fg-soft)]"
+				class="rounded-md border border-stw-border bg-stw-bg-sunken px-3 py-2 text-[11.5px] text-stw-fg-soft"
 			>
 				{#if fileCount > 0}
 					{folderCount} folder{folderCount === 1 ? '' : 's'} + {fileCount} file{fileCount === 1
@@ -304,7 +304,7 @@
 		{/if}
 
 		{#if running}
-			<div class="text-[12px] text-[var(--stw-fg-soft)]">
+			<div class="text-[12px] text-stw-fg-soft">
 				{processed} processed{#if failed > 0}
 					· {failed} failed{/if}
 			</div>

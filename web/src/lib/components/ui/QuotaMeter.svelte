@@ -18,25 +18,17 @@
 	const overSoft = $derived(soft != null && soft > 0 && used >= soft);
 	const danger = $derived(pct >= 90);
 
-	const fillCls = $derived(
-		danger
-			? 'bg-[var(--stw-err)]'
-			: overSoft
-				? 'bg-[var(--stw-warn)]'
-				: 'bg-[var(--stw-accent-500)]'
-	);
+	const fillCls = $derived(danger ? 'bg-stw-err' : overSoft ? 'bg-stw-warn' : 'bg-stw-accent-500');
 </script>
 
 <div class="flex flex-col gap-1.5">
-	<div
-		class="h-2 overflow-hidden rounded-full border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)]"
-	>
+	<div class="h-2 overflow-hidden rounded-full border border-stw-border bg-stw-bg-sunken">
 		{#if cap > 0}
 			<div class="h-full transition-[width] duration-200 {fillCls}" style="width:{pct}%;"></div>
 		{/if}
 	</div>
 	{#if stats}
-		<div class="flex flex-wrap gap-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">
+		<div class="flex flex-wrap gap-3 font-mono text-[12px] text-stw-fg-mute">
 			{@render stats()}
 		</div>
 	{/if}

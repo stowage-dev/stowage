@@ -11,10 +11,10 @@
 
 	let { kind, size = 15 }: Props = $props();
 
-	const color = $derived(kind === 'folder' ? 'var(--stw-accent-600)' : 'var(--stw-fg-mute)');
+	const colorCls = $derived(kind === 'folder' ? 'text-stw-accent-600' : 'text-stw-fg-mute');
 </script>
 
-<span style="color:{color};display:inline-flex;align-items:center;">
+<span class="inline-flex items-center {colorCls}">
 	{#if kind === 'folder'}
 		<Folder {size} strokeWidth={1.7} />
 	{:else if kind === 'image'}
