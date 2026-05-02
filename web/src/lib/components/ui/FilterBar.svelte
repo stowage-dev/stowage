@@ -13,7 +13,7 @@
 </script>
 
 <section
-	class="grid items-end gap-3 rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] p-3"
+	class="grid items-end gap-3 rounded-lg border border-stw-border bg-stw-bg-panel p-3"
 	style="grid-template-columns:repeat(auto-fit,minmax({minColumn},1fr));"
 >
 	{@render children()}

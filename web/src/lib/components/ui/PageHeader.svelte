@@ -21,19 +21,19 @@
 
 <header class="mb-4 flex items-start gap-3">
 	{#if icon}
-		<span class="mt-[2px] inline-flex items-center justify-center text-[var(--stw-fg-mute)]">
+		<span class="mt-[2px] inline-flex items-center justify-center text-stw-fg-mute">
 			{@render icon()}
 		</span>
 	{/if}
 	<div class="min-w-0 flex-1">
-		<h1 class="{titleSize} m-0 truncate leading-tight font-semibold text-[var(--stw-fg)]">
+		<h1 class="{titleSize} m-0 truncate leading-tight font-semibold text-stw-fg">
 			{title}
 		</h1>
 		{#if subtitle}
-			<p class="m-0 mt-1 text-[13px] leading-[1.45] text-[var(--stw-fg-mute)]">{subtitle}</p>
+			<p class="m-0 mt-1 text-[13px] leading-[1.45] text-stw-fg-mute">{subtitle}</p>
 		{/if}
 		{#if meta}
-			<div class="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--stw-fg-soft)]">
+			<div class="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-stw-fg-soft">
 				{@render meta()}
 			</div>
 		{/if}

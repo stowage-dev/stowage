@@ -18,16 +18,13 @@
 
 <div class="flex flex-col gap-1.5">
 	{#if label}
-		<label
-			for={forId}
-			class="flex items-center gap-1.5 text-[12px] font-medium text-[var(--stw-fg-mute)]"
-		>
+		<label for={forId} class="flex items-center gap-1.5 text-[12px] font-medium text-stw-fg-mute">
 			<span>{label}</span>
 			{#if optional}
-				<span class="font-normal text-[var(--stw-fg-soft)]">(optional)</span>
+				<span class="font-normal text-stw-fg-soft">(optional)</span>
 			{/if}
 			{#if hint}
-				<span class="ml-auto text-[11.5px] font-normal text-[var(--stw-fg-soft)]">
+				<span class="ml-auto text-[11.5px] font-normal text-stw-fg-soft">
 					{@render hint()}
 				</span>
 			{/if}
@@ -35,8 +32,8 @@
 	{/if}
 	{@render children()}
 	{#if error}
-		<div class="text-[11.5px] text-[var(--stw-err)]">{error}</div>
+		<div class="text-[11.5px] text-stw-err">{error}</div>
 	{:else if helper}
-		<div class="text-[11.5px] text-[var(--stw-fg-soft)]">{helper}</div>
+		<div class="text-[11.5px] text-stw-fg-soft">{helper}</div>
 	{/if}
 </div>

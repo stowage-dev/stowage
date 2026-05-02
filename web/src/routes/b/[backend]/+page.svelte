@@ -12,7 +12,7 @@
 {#if backend && bucketsResult}
 	<BackendBuckets {backend} {bucketsResult} />
 {:else}
-	<div style="padding:40px;color:var(--stw-fg-soft);font-size:13px;">
+	<div class="stw-page-loading">
 		Backend not found: <code>{page.params.backend}</code>
 	</div>
 {/if}

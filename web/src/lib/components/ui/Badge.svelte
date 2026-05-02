@@ -9,15 +9,16 @@
 		variant?: Variant;
 		children?: Snippet;
 		mono?: boolean;
-		style?: string;
+		class?: string;
 	}
 
-	let { variant, children, mono = false, style = '' }: Props = $props();
+	let { variant, children, mono = false, class: klass = '' }: Props = $props();
 
-	const cls = $derived('stw-badge' + (variant ? ' stw-badge--' + variant : ''));
-	const styleStr = $derived((mono ? 'font-family:var(--stw-font-mono);' : '') + style);
+	const cls = $derived(
+		`stw-badge ${variant ? 'stw-badge--' + variant : ''} ${mono ? 'font-stw-mono' : ''} ${klass}`
+	);
 </script>
 
-<span class={cls} style={styleStr}>
+<span class={cls}>
 	{#if children}{@render children()}{/if}
 </span>

@@ -119,7 +119,7 @@
 	const cols = 'grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_90px_90px_100px_110px]';
 </script>
 
-<div class="stw-page-pad flex flex-col gap-4">
+<div class="flex flex-col gap-4 stw-page-pad">
 	<PageHeader title="Shares">
 		{#snippet meta()}
 			<StatLine
@@ -163,11 +163,9 @@
 	{:else if filtered.length === 0}
 		<EmptyState variant="card" hint={`No shares match "${q}".`} />
 	{:else}
-		<div
-			class="overflow-hidden rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)]"
-		>
+		<div class="overflow-hidden rounded-lg border border-stw-border bg-stw-bg-panel">
 			<div
-				class="grid {cols} gap-2.5 border-b border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.06em] text-[var(--stw-fg-soft)] uppercase"
+				class="grid {cols} gap-2.5 border-b border-stw-border bg-stw-bg-sunken px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.06em] text-stw-fg-soft uppercase"
 			>
 				<span>Target</span>
 				<span>Link</span>
@@ -180,7 +178,7 @@
 				{@const exp = expiryLabel(s)}
 				{@const url = api.shareURL(s)}
 				<div
-					class="grid {cols} items-center gap-2.5 border-b border-[var(--stw-border)] px-3.5 py-2.5 text-[13px] {s.revoked
+					class="grid {cols} items-center gap-2.5 border-b border-stw-border px-3.5 py-2.5 text-[13px] {s.revoked
 						? 'opacity-55'
 						: ''}"
 				>
@@ -188,11 +186,11 @@
 						<div class="truncate font-mono" title="{s.backend_id}/{s.bucket}/{s.key}">
 							{s.bucket}/{s.key}
 						</div>
-						<div class="flex items-center gap-1.5 text-[11px] text-[var(--stw-fg-soft)]">
+						<div class="flex items-center gap-1.5 text-[11px] text-stw-fg-soft">
 							<span>{s.backend_id}</span>
 							{#if s.has_password}
 								<span
-									class="inline-flex items-center gap-0.5 text-[var(--stw-warn)]"
+									class="inline-flex items-center gap-0.5 text-stw-warn"
 									title="Password-protected"
 								>
 									<Lock size={10} strokeWidth={1.7} />
@@ -203,26 +201,24 @@
 							{/if}
 						</div>
 					</div>
-					<div
-						class="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-[var(--stw-fg-mute)]"
-					>
+					<div class="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-stw-fg-mute">
 						<span class="min-w-0 flex-1 truncate" title={url}>/s/{s.code}</span>
 					</div>
 					<div class="text-right font-mono">
-						{num(s.download_count)}{#if s.max_downloads}<span class="text-[var(--stw-fg-soft)]"
+						{num(s.download_count)}{#if s.max_downloads}<span class="text-stw-fg-soft"
 								>/{s.max_downloads}</span
 							>{/if}
 					</div>
 					<div
 						class="text-right text-[12px] {exp.tone === 'warn'
-							? 'text-[var(--stw-warn)]'
+							? 'text-stw-warn'
 							: exp.tone === 'soft'
-								? 'text-[var(--stw-fg-soft)]'
-								: 'text-[var(--stw-fg-mute)]'}"
+								? 'text-stw-fg-soft'
+								: 'text-stw-fg-mute'}"
 					>
 						{exp.text}
 					</div>
-					<div class="text-right font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+					<div class="text-right font-mono text-[11.5px] text-stw-fg-soft">
 						{new Date(s.created_at).toLocaleDateString()}
 					</div>
 					<div class="flex items-center justify-end gap-1">

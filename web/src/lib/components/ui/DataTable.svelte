@@ -38,23 +38,19 @@
 	}
 </script>
 
-<div class="overflow-hidden rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)]">
+<div class="overflow-hidden rounded-lg border border-stw-border bg-stw-bg-panel">
 	<table class="w-full border-separate border-spacing-0 text-[13px]">
 		{#if caption}
 			<caption class="sr-only">{caption}</caption>
 		{/if}
 		<thead>
-			<tr
-				class="h-[32px] bg-[var(--stw-bg-sunken)] shadow-[inset_0_-1px_0_var(--stw-border)] {stickyHeader
-					? 'sticky top-0 z-10'
-					: ''}"
-			>
+			<tr class="h-[32px] bg-stw-bg-sunken row-divider {stickyHeader ? 'sticky top-0 z-10' : ''}">
 				{#each columns as col (col.key)}
 					<th
 						scope="col"
 						class="{alignCls(
 							col.align
-						)} px-3 text-[11.5px] font-medium tracking-[0.04em] text-[var(--stw-fg-mute)] uppercase"
+						)} px-3 text-[11.5px] font-medium tracking-[0.04em] text-stw-fg-mute uppercase"
 						style={col.width ? `width:${col.width};` : ''}
 					>
 						{col.label}
@@ -64,16 +60,13 @@
 		</thead>
 		<tbody>
 			{#each rows as item, i (i)}
-				<tr class="shadow-[inset_0_-1px_0_var(--stw-border)]" style="height:{rowHeight}px;">
+				<tr class="row-divider" style="height:{rowHeight}px;">
 					{@render row(item, i)}
 				</tr>
 			{/each}
 			{#if rows.length === 0}
 				<tr>
-					<td
-						colspan={columns.length}
-						class="px-4 py-10 text-center text-[13px] text-[var(--stw-fg-soft)]"
-					>
+					<td colspan={columns.length} class="px-4 py-10 text-center text-[13px] text-stw-fg-soft">
 						{#if empty}{@render empty()}{:else}{emptyText}{/if}
 					</td>
 				</tr>

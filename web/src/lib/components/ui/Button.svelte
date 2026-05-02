@@ -16,7 +16,6 @@
 		title?: string;
 		type?: 'button' | 'submit' | 'reset';
 		class?: string;
-		style?: string;
 	}
 
 	let {
@@ -28,23 +27,27 @@
 		disabled = false,
 		title,
 		type = 'button',
-		class: klass = '',
-		style = ''
+		class: klass = ''
 	}: Props = $props();
 
-	const variantCls = {
+	const variantCls: Record<Variant, string> = {
 		default: '',
-		primary: ' stw-btn--primary',
-		ghost: ' stw-btn--ghost',
-		danger: ' stw-btn--danger'
+		primary: 'stw-btn--primary',
+		ghost: 'stw-btn--ghost',
+		danger: 'stw-btn--danger'
 	};
-	const sizeCls = { sm: ' stw-btn--sm', md: '', lg: ' stw-btn--lg' };
+	const sizeCls: Record<Size, string> = {
+		sm: 'stw-btn--sm',
+		md: '',
+		lg: 'stw-btn--lg'
+	};
 
-	const cls = $derived('stw-btn' + variantCls[variant] + sizeCls[size] + ' stw-focus ' + klass);
-	const styleStr = $derived((disabled ? 'opacity:.5;cursor:not-allowed;' : '') + style);
+	const cls = $derived(
+		`stw-btn ${variantCls[variant]} ${sizeCls[size]} disabled:cursor-not-allowed disabled:opacity-50 ${klass}`
+	);
 </script>
 
-<button {type} {onclick} {disabled} {title} class={cls} style={styleStr}>
+<button {type} {onclick} {disabled} {title} class={cls}>
 	{#if icon}{@render icon()}{/if}
 	{#if children}{@render children()}{/if}
 </button>

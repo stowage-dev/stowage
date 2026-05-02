@@ -23,9 +23,9 @@
 	<button
 		type="button"
 		onclick={oncmdk}
-		class="stw-focus stw-topbar-search flex h-[28px] cursor-text items-center gap-2 rounded-[7px] border bg-[var(--stw-bg-sunken)] py-0 pr-2 pl-2.5 text-[13px] text-[var(--stw-fg-mute)] transition-[border-color,background] duration-[120ms] {hovered
-			? 'border-[var(--stw-border-strong)]'
-			: 'border-[var(--stw-border)]'}"
+		class="flex h-[28px] stw-topbar-search cursor-text items-center gap-2 rounded-[7px] border bg-stw-bg-sunken py-0 pr-2 pl-2.5 text-[13px] text-stw-fg-mute focus-ring transition-[border-color,background] duration-[120ms] {hovered
+			? 'border-stw-border-strong'
+			: 'border-stw-border'}"
 		class:wide={variant === 'search'}
 		onmouseenter={() => (hovered = true)}
 		onmouseleave={() => (hovered = false)}
@@ -44,7 +44,7 @@
 {/snippet}
 
 <header
-	class="flex h-[51px] flex-shrink-0 items-center gap-3 border-b border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3.5"
+	class="flex h-[51px] flex-shrink-0 items-center gap-3 border-b border-stw-border bg-stw-bg-panel px-3.5"
 >
 	{@render menuBtn()}
 	{#if variant === 'search'}

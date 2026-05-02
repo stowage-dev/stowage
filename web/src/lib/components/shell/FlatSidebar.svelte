@@ -60,9 +60,9 @@
 	const health = $derived(b ? backendHealth(b) : { state: 'warn' as const });
 
 	const navRowCls =
-		'stw-focus flex h-[28px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-2 text-left text-[13px]';
+		'focus-ring flex h-[28px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-2 text-left text-[13px]';
 	const sectionLabelCls =
-		'text-[10.5px] font-semibold tracking-[0.08em] uppercase text-[var(--stw-fg-soft)]';
+		'text-[10.5px] font-semibold tracking-[0.08em] uppercase text-stw-fg-soft';
 </script>
 
 {#snippet bucketRow(
@@ -79,8 +79,8 @@
 			type="button"
 			{onclick}
 			class="{navRowCls} mx-1 w-[calc(100%-8px)] {active
-				? 'bg-[var(--stw-bg-hover)] text-[var(--stw-fg)]'
-				: 'text-[var(--stw-fg-mute)]'}"
+				? 'bg-stw-bg-hover text-stw-fg'
+				: 'text-stw-fg-mute'}"
 		>
 			{@render leadingIcon()}
 			<span class="min-w-0 flex-1 truncate">{label}</span>
@@ -88,9 +88,9 @@
 		</button>
 		<button
 			type="button"
-			class="stw-focus absolute top-1/2 right-2 inline-flex h-[22px] w-[22px] -translate-y-1/2 cursor-pointer items-center justify-center rounded border-0 bg-transparent transition-opacity duration-[120ms] hover:bg-[var(--stw-bg-sunken)] hover:text-[var(--stw-fg)] {pinned
-				? 'text-[var(--stw-warn)] opacity-100'
-				: 'text-[var(--stw-fg-soft)] opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'}"
+			class="absolute top-1/2 right-2 inline-flex h-[22px] w-[22px] -translate-y-1/2 cursor-pointer items-center justify-center rounded border-0 bg-transparent focus-ring transition-opacity duration-[120ms] hover:bg-stw-bg-sunken hover:text-stw-fg {pinned
+				? 'text-stw-warn opacity-100'
+				: 'text-stw-fg-soft opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'}"
 			aria-label={pinned ? 'Unpin bucket' : 'Pin bucket'}
 			title={pinned ? 'Unpin bucket' : 'Pin bucket'}
 			onclick={(e) => {
@@ -111,7 +111,7 @@
 	<div class="px-3.5 pt-2.5 pb-1">
 		<div class="{sectionLabelCls} mb-1.5">Backend</div>
 		<div
-			class="flex h-[36px] cursor-pointer items-center gap-2 rounded-[7px] border border-[var(--stw-border)] bg-[var(--stw-bg-sunken)] px-2.5"
+			class="flex h-[36px] cursor-pointer items-center gap-2 rounded-[7px] border border-stw-border bg-stw-bg-sunken px-2.5"
 		>
 			<BackendMark {kind} size={18} />
 			<div class="min-w-0 flex-1">
@@ -125,19 +125,19 @@
 	<div class="flex items-center justify-between px-2 pt-2.5 pb-1 pl-3.5">
 		<span class={sectionLabelCls}>Buckets</span>
 		<Tooltip text="Create bucket">
-			<span class="inline-flex cursor-pointer text-[var(--stw-fg-soft)]">
+			<span class="inline-flex cursor-pointer text-stw-fg-soft">
 				<Plus size={12} strokeWidth={1.7} />
 			</span>
 		</Tooltip>
 	</div>
 
 	{#if bs?.status === 'loading'}
-		<div class="px-3.5 py-1.5 text-[12px] text-[var(--stw-fg-soft)]">Loading…</div>
+		<div class="px-3.5 py-1.5 text-[12px] text-stw-fg-soft">Loading…</div>
 	{:else if bs?.status === 'error'}
 		<div
 			role="button"
 			tabindex="0"
-			class="cursor-pointer px-3.5 py-1.5 font-mono text-[12px] break-words text-[var(--stw-err)]"
+			class="cursor-pointer px-3.5 py-1.5 font-mono text-[12px] break-words text-stw-err"
 			title="Click to retry · {bs.message}"
 			onclick={() => refreshBuckets(b.id)}
 			onkeydown={(e) => {
@@ -171,7 +171,7 @@
 				route.type === 'bucket' && route.backend === pin.backend_id && route.bucket === pin.bucket}
 			{#snippet starIcon()}<Star size={12} strokeWidth={1.7} fill="currentColor" />{/snippet}
 			{#snippet pinBackendLabel()}
-				<span class="font-mono text-[10.5px] text-[var(--stw-fg-soft)]">{pin.backend_id}</span>
+				<span class="font-mono text-[10.5px] text-stw-fg-soft">{pin.backend_id}</span>
 			{/snippet}
 			{@render bucketRow(
 				active,
@@ -192,9 +192,7 @@
 			<button
 				type="button"
 				onclick={() => nav({ type: item.route })}
-				class="{navRowCls} {active
-					? 'bg-[var(--stw-bg-hover)] text-[var(--stw-fg)]'
-					: 'text-[var(--stw-fg-mute)]'}"
+				class="{navRowCls} {active ? 'bg-stw-bg-hover text-stw-fg' : 'text-stw-fg-mute'}"
 			>
 				<item.icon size={14} strokeWidth={1.7} />{item.label}
 			</button>

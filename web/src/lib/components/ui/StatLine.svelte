@@ -19,32 +19,30 @@
 	function toneCls(tone: Item['tone']): string {
 		switch (tone) {
 			case 'ok':
-				return 'text-[var(--stw-ok)]';
+				return 'text-stw-ok';
 			case 'warn':
-				return 'text-[var(--stw-warn)]';
+				return 'text-stw-warn';
 			case 'err':
-				return 'text-[var(--stw-err)]';
+				return 'text-stw-err';
 			case 'mute':
-				return 'text-[var(--stw-fg-soft)]';
+				return 'text-stw-fg-soft';
 			default:
-				return 'text-[var(--stw-fg-mute)]';
+				return 'text-stw-fg-mute';
 		}
 	}
 </script>
 
 <div
-	class="flex flex-wrap items-center gap-2 text-[12px] text-[var(--stw-fg-mute)] {mono
-		? 'font-mono'
-		: ''}"
+	class="flex flex-wrap items-center gap-2 text-[12px] text-stw-fg-mute {mono ? 'font-mono' : ''}"
 >
 	{#each items as item, i (item.label + i)}
 		{#if i > 0}
-			<span class="text-[var(--stw-fg-soft)]" aria-hidden="true">{separator}</span>
+			<span class="text-stw-fg-soft" aria-hidden="true">{separator}</span>
 		{/if}
 		<span class={toneCls(item.tone)}>
 			{#if item.value !== undefined && item.value !== ''}
 				<span class="font-medium">{item.value}</span>
-				<span class="ml-1 text-[var(--stw-fg-soft)]">{item.label}</span>
+				<span class="ml-1 text-stw-fg-soft">{item.label}</span>
 			{:else}
 				{item.label}
 			{/if}

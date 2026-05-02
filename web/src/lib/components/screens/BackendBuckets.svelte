@@ -119,7 +119,7 @@
 	{#if creating}
 		<form
 			onsubmit={create}
-			class="mb-4 flex items-center gap-2.5 rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] p-3.5"
+			class="mb-4 flex items-center gap-2.5 rounded-lg border border-stw-border bg-stw-bg-panel p-3.5"
 		>
 			<input
 				class="stw-input flex-1 font-mono"
@@ -148,7 +148,7 @@
 	<DataTable {columns} rows={list} emptyText={loading ? 'Loading…' : 'No buckets yet.'}>
 		{#snippet row(bk)}
 			<td
-				class="cursor-pointer px-3 hover:bg-[var(--stw-bg-hover)]"
+				class="cursor-pointer px-3 hover:bg-stw-bg-hover"
 				onclick={() =>
 					goto(urlForRoute({ type: 'bucket', backend: b.id, bucket: bk.name, prefix: [] }))}
 			>
@@ -157,7 +157,7 @@
 					<span class="font-medium">{bk.name}</span>
 				</span>
 			</td>
-			<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">
+			<td class="px-3 font-mono text-[12px] text-stw-fg-mute">
 				{#if !bk.size_tracked}
 					<span title="Size tracking is off for this bucket">—</span>
 				{:else if typeof bk.size_bytes === 'number'}
@@ -172,10 +172,10 @@
 					<span title="Not yet computed — refresh after the next scan">…</span>
 				{/if}
 			</td>
-			<td class="px-3 font-mono text-[12px] text-[var(--stw-fg-mute)]">
+			<td class="px-3 font-mono text-[12px] text-stw-fg-mute">
 				{bk.created_at ? new Date(bk.created_at).toLocaleString() : '—'}
 			</td>
-			<td class="px-3 text-right text-[var(--stw-fg-soft)]">
+			<td class="px-3 text-right text-stw-fg-soft">
 				<span class="inline-flex items-center gap-1.5">
 					{#if isAdmin}
 						{#snippet trashIcon()}<Trash2 size={13} strokeWidth={1.7} />{/snippet}
