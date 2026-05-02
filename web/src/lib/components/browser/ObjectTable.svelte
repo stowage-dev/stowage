@@ -134,14 +134,16 @@
 </script>
 
 {#snippet selectAllCheckboxHeader()}
-	<input
-		type="checkbox"
-		class="stw-check"
-		aria-label="Select all"
-		checked={selected.length > 0 && selected.length === items.length}
-		use:indeterminate
-		onchange={(e) => selectAll((e.target as HTMLInputElement).checked)}
-	/>
+	<span class="inline-flex items-center">
+		<input
+			type="checkbox"
+			class="stw-check"
+			aria-label="Select all"
+			checked={selected.length > 0 && selected.length === items.length}
+			use:indeterminate
+			onchange={(e) => selectAll((e.target as HTMLInputElement).checked)}
+		/>
+	</span>
 {/snippet}
 
 <DataTable
@@ -158,17 +160,19 @@
 >
 	{#snippet row(o)}
 		{@const sel = selected.includes(o.key)}
-		<td class={cellPadLCls + ' align-middle'}>
-			<input
-				type="checkbox"
-				class="stw-check"
-				aria-label={sel ? `Deselect ${o.displayName}` : `Select ${o.displayName}`}
-				checked={sel}
-				onclick={(e) => onCheckboxClick(o.key, e)}
-			/>
+		<td class="px-3 align-middle">
+			<span class="inline-flex items-center align-middle">
+				<input
+					type="checkbox"
+					class="stw-check"
+					aria-label={sel ? `Deselect ${o.displayName}` : `Select ${o.displayName}`}
+					checked={sel}
+					onclick={(e) => onCheckboxClick(o.key, e)}
+				/>
+			</span>
 		</td>
-		<td class={cellPadCls}>
-			<span class="inline-flex items-center gap-2.5">
+		<td class={cellPadCls + ' align-middle'}>
+			<span class="inline-flex items-center gap-2.5 align-middle">
 				<ObjectIcon kind={o.kind} />
 				<span
 					role="button"
@@ -191,16 +195,19 @@
 				</span>
 			</span>
 		</td>
-		<td class={cellPadCls + ' text-right font-mono text-[12px] text-stw-fg-mute tabular-nums'}>
+		<td
+			class={cellPadCls +
+				' text-right align-middle font-mono text-[12px] text-stw-fg-mute tabular-nums'}
+		>
 			{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
 		</td>
-		<td class={cellPadCls + ' font-mono text-[12px] text-stw-fg-mute'}>
+		<td class={cellPadCls + ' align-middle font-mono text-[12px] text-stw-fg-mute'}>
 			{o.modified ? new Date(o.modified).toLocaleString() : '—'}
 		</td>
-		<td class={cellPadCls + ' font-mono text-[12px] text-stw-fg-mute'}>
+		<td class={cellPadCls + ' align-middle font-mono text-[12px] text-stw-fg-mute'}>
 			{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
 		</td>
-		<td class={cellPadCls + ' text-right'} onclick={(e) => e.stopPropagation()}>
+		<td class={cellPadCls + ' text-right align-middle'} onclick={(e) => e.stopPropagation()}>
 			{#if o.kind !== 'folder'}
 				<span
 					class="inline-flex gap-0.5 transition-opacity duration-[120ms] group-hover:opacity-100 {sel
