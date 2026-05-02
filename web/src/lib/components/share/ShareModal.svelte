@@ -113,9 +113,7 @@
 	{#if !result}
 		<div class="flex flex-col gap-3.5 px-[18px] py-4">
 			<div class="flex flex-col gap-1.5">
-				<span
-					class="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--stw-fg-mute)]"
-				>
+				<span class="inline-flex items-center gap-1.5 text-[12px] font-medium text-stw-fg-mute">
 					<Clock size={12} strokeWidth={1.7} /> Expires
 				</span>
 				<Segmented
@@ -137,11 +135,9 @@
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<span
-					class="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--stw-fg-mute)]"
-				>
+				<span class="inline-flex items-center gap-1.5 text-[12px] font-medium text-stw-fg-mute">
 					<Lock size={12} strokeWidth={1.7} /> Password
-					<span class="font-normal text-[var(--stw-fg-soft)]">(optional)</span>
+					<span class="font-normal text-stw-fg-soft">(optional)</span>
 				</span>
 				<PasswordField
 					bind:value={password}
@@ -164,7 +160,7 @@
 			<button
 				type="button"
 				onclick={() => (advanced = !advanced)}
-				class="stw-focus cursor-pointer self-start border-0 bg-transparent p-0 text-[11.5px] text-[var(--stw-fg-soft)] hover:text-[var(--stw-fg)]"
+				class="cursor-pointer self-start border-0 bg-transparent p-0 text-[11.5px] text-stw-fg-soft focus-ring hover:text-stw-fg"
 			>
 				{advanced ? '− Hide advanced' : '+ Advanced'}
 			</button>
@@ -187,11 +183,11 @@
 		<div class="flex flex-col gap-3 px-[18px] py-4">
 			<CopyField value={fullURL} ariaLabel="Copy link" />
 
-			<div class="flex flex-col gap-1 text-[12px] text-[var(--stw-fg-mute)]">
+			<div class="flex flex-col gap-1 text-[12px] text-stw-fg-mute">
 				{#if result.expires_at}
 					<div>
 						Expires
-						<span class="text-[var(--stw-fg)]">{new Date(result.expires_at).toLocaleString()}</span>
+						<span class="text-stw-fg">{new Date(result.expires_at).toLocaleString()}</span>
 					</div>
 				{:else}
 					<div>No expiry — revoke manually when done.</div>
@@ -202,7 +198,7 @@
 				{#if result.max_downloads}
 					<div>
 						Limited to
-						<span class="text-[var(--stw-fg)]">{result.max_downloads}</span>
+						<span class="text-stw-fg">{result.max_downloads}</span>
 						download{result.max_downloads === 1 ? '' : 's'}.
 					</div>
 				{/if}

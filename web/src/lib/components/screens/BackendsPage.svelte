@@ -171,7 +171,7 @@
 			{/if}
 		</EmptyState>
 	{:else}
-		<div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">
+		<div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
 			{#each rows as r (r.id)}
 				{@const kind = rowKind(r)}
 				{@const info = BACKEND_KINDS[kind]}
@@ -187,8 +187,8 @@
 					tabindex={clickable ? 0 : undefined}
 					onclick={clickable ? () => open(r) : undefined}
 					onkeydown={clickable ? (e) => onCardKey(r, e) : undefined}
-					class="stw-focus relative flex flex-col gap-2.5 rounded-lg border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] p-3.5 text-left transition-[border-color,box-shadow] duration-[120ms] {clickable
-						? 'cursor-pointer hover:border-[var(--stw-border-strong)] hover:shadow-[var(--stw-shadow-sm)]'
+					class="relative flex flex-col gap-2.5 rounded-lg border border-stw-border bg-stw-bg-panel p-3.5 text-left focus-ring transition-[border-color,box-shadow] duration-[120ms] {clickable
+						? 'cursor-pointer hover:border-stw-border-strong hover:shadow-stw-sm'
 						: ''}"
 				>
 					<div class="flex items-center gap-2.5">
@@ -200,7 +200,7 @@
 									<Dot variant={health.state} label={health.state} />
 								</span>
 							</div>
-							<div class="font-mono text-[11.5px] text-[var(--stw-fg-soft)]">
+							<div class="font-mono text-[11.5px] text-stw-fg-soft">
 								{info.label.toLowerCase()} · {r.id}
 							</div>
 						</div>
@@ -208,7 +208,7 @@
 
 					{#if isAdmin && (ep?.endpoint || ep?.region)}
 						<div
-							class="truncate font-mono text-[11.5px] text-[var(--stw-fg-mute)]"
+							class="truncate font-mono text-[11.5px] text-stw-fg-mute"
 							title={ep?.endpoint ?? ''}
 						>
 							{ep?.endpoint || '—'}{ep?.region ? ' · ' + ep.region : ''}
@@ -238,26 +238,24 @@
 						{/if}
 					</div>
 
-					<div class="flex justify-between text-[12px] text-[var(--stw-fg-mute)] tabular-nums">
+					<div class="flex justify-between text-[12px] text-stw-fg-mute tabular-nums">
 						<span>{bc != null ? bc + ' buckets' : '—'}</span>
 						<span>{probe ?? '—'}</span>
 					</div>
 
 					{#if r.backend && !r.backend.healthy && r.backend.last_error}
-						<div class="font-mono text-[11.5px] text-[var(--stw-err)]">
+						<div class="font-mono text-[11.5px] text-stw-err">
 							{r.backend.last_error}
 						</div>
 					{/if}
 
 					{#if isAdmin && ep}
-						<div
-							class="absolute top-2 right-2 inline-flex gap-0.5 rounded-md bg-[var(--stw-bg-panel)]"
-						>
+						<div class="absolute top-2 right-2 inline-flex gap-0.5 rounded-md bg-stw-bg-panel">
 							{#if yaml}
 								<Tooltip text={yamlMessage}>
 									<span
 										aria-disabled="true"
-										class="inline-flex h-[24px] w-[24px] items-center justify-center text-[var(--stw-fg-soft)] opacity-45"
+										class="inline-flex h-[24px] w-[24px] items-center justify-center text-stw-fg-soft opacity-45"
 									>
 										<Lock size={12} strokeWidth={1.8} />
 									</span>

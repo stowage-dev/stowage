@@ -46,7 +46,7 @@
 </script>
 
 <Modal {title} {busy} onclose={oncancel} maxWidth="440px">
-	<div class="px-[18px] py-4 text-[13px] leading-[1.5] text-[var(--stw-fg-mute)]">
+	<div class="px-[18px] py-4 text-[13px] leading-[1.5] text-stw-fg-mute">
 		{#if body}
 			{@render body()}
 		{:else if description}

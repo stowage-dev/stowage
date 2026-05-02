@@ -57,7 +57,6 @@
 	});
 
 	const isDrawer = $derived(variant === 'drawer-right');
-	const widthStyle = $derived(maxWidth ? `max-width:${maxWidth};` : '');
 </script>
 
 <div
@@ -65,7 +64,7 @@
 	onclick={() => {
 		if (!busy && closeOnBackdrop) onclose();
 	}}
-	class="fixed inset-0 z-[var(--stw-z-modal)] flex animate-[stw-fade-in_120ms_ease-out] bg-black/35 {isDrawer
+	class="fixed inset-0 z-50 flex animate-[stw-fade-in_120ms_ease-out] bg-black/35 {isDrawer
 		? 'justify-end'
 		: 'items-center justify-center'}"
 >
@@ -77,27 +76,25 @@
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
 		onkeydown={(e) => e.stopPropagation()}
-		style={widthStyle}
-		class="flex flex-col overflow-hidden border border-[var(--stw-border)] bg-[var(--stw-bg-panel)] shadow-[var(--stw-shadow-lg)] {isDrawer
+		style={maxWidth ? `max-width:${maxWidth};` : ''}
+		class="flex flex-col overflow-hidden border border-stw-border bg-stw-bg-panel shadow-stw-lg {isDrawer
 			? 'h-full w-[420px] max-w-[calc(100vw-24px)] animate-[stw-slide-in-right_180ms_cubic-bezier(0.4,0,0.2,1)] rounded-l-xl border-r-0'
 			: 'max-h-[calc(100vh-48px)] w-[440px] max-w-[calc(100vw-24px)] animate-[stw-zoom-in_160ms_cubic-bezier(0.4,0,0.2,1)] rounded-xl'}"
 	>
 		{#if header}
 			{@render header()}
 		{:else}
-			<header
-				class="flex items-center gap-2.5 border-b border-[var(--stw-border)] px-[18px] py-3.5"
-			>
+			<header class="flex items-center gap-2.5 border-b border-stw-border px-[18px] py-3.5">
 				{#if icon}
-					<span class="inline-flex items-center justify-center text-[var(--stw-accent-600)]">
+					<span class="inline-flex items-center justify-center text-stw-accent-600">
 						{@render icon()}
 					</span>
 				{/if}
 				<div class="min-w-0 flex-1">
-					<div class="truncate text-[14px] font-semibold text-[var(--stw-fg)]">{title}</div>
+					<div class="truncate text-[14px] font-semibold text-stw-fg">{title}</div>
 					{#if subtitle}
 						<div
-							class="mt-0.5 truncate text-[11.5px] text-[var(--stw-fg-soft)] {subtitleMono
+							class="mt-0.5 truncate text-[11.5px] text-stw-fg-soft {subtitleMono
 								? 'font-mono'
 								: ''}"
 						>
@@ -110,7 +107,7 @@
 						type="button"
 						onclick={onclose}
 						disabled={busy}
-						class="stw-focus inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-[var(--stw-fg-mute)] hover:bg-[var(--stw-bg-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+						class="inline-flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent text-stw-fg-mute focus-ring hover:bg-stw-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
 						aria-label="Close"
 					>
 						<X size={14} strokeWidth={1.7} />
@@ -126,9 +123,7 @@
 		{/if}
 
 		{#if footer}
-			<footer
-				class="flex justify-end gap-2 border-t border-[var(--stw-border)] bg-[var(--stw-bg-panel)] px-3.5 py-3"
-			>
+			<footer class="flex justify-end gap-2 border-t border-stw-border bg-stw-bg-panel px-3.5 py-3">
 				{@render footer()}
 			</footer>
 		{/if}
