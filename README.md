@@ -1,5 +1,7 @@
 # stowage
 
+> ⚠️ **Warning:** This repository contains AI-generated content that has not yet gone through review. This warning will be removed once all content has been reviewed.
+
 [![Website](https://img.shields.io/badge/website-stowage.dev-0a7cff.svg)](https://stowage.dev)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL%203.0--or--later-blue.svg)](./LICENSE)
 [![CI](https://github.com/stowage-dev/stowage/actions/workflows/ci.yml/badge.svg)](https://github.com/stowage-dev/stowage/actions/workflows/ci.yml)
