@@ -28,6 +28,10 @@ The easiest way to add this is `git commit -s` (or set
 if you also want to sign cryptographically — that's optional, the DCO
 sign-off is required).
 
+For a hands-off setup, run `make setup-hooks` once after cloning. That
+points this clone at `.githooks/`, which auto-appends the trailer to
+every commit so you never have to remember `-s`.
+
 If you forget, the bot will tell you, and you can amend with:
 
 ```

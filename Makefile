@@ -2,7 +2,7 @@ BINARY          := stowage
 CMD             := ./cmd/stowage
 BIN_DIR         := bin
 
-.PHONY: help build run test envtest envtest-assets vet lint tidy clean docker frontend
+.PHONY: help build run test envtest envtest-assets vet lint tidy clean docker frontend setup-hooks
 
 help:
 	@echo "Targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  frontend        bun install + bun run build in web/"
 	@echo "  docker          build the production stowage Docker image"
 	@echo "  clean           remove $(BIN_DIR)/"
+	@echo "  setup-hooks     point this clone at .githooks/ (DCO auto-signoff)"
 
 build:
 	@mkdir -p $(BIN_DIR)
@@ -60,3 +61,7 @@ docker:
 
 clean:
 	rm -rf $(BIN_DIR)
+
+setup-hooks:
+	git config core.hooksPath .githooks
+	@echo "Hooks installed. Future commits will auto-append a DCO Signed-off-by."
