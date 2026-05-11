@@ -35,7 +35,10 @@ type QuotaEnforcer interface {
 // uploadOps is the set of classified S3 operations that consume bucket
 // quota. CompleteMultipartUpload is intentionally omitted — its part
 // uploads have already been quota-checked individually, and the final
-// assembly carries no Content-Length we can pre-evaluate.
+// assembly carries no Content-Length we can pre-evaluate. PostObject
+// runs through servePostObject which records quota inline, so it isn't
+// included here either; the entry would never fire from the main
+// dispatch path.
 var uploadOps = map[string]struct{}{
 	"PutObject":  {},
 	"UploadPart": {},
@@ -271,6 +274,17 @@ func (s *Server) recordAudit(r *http.Request, reqID string, out servedRequest) {
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request, reqID string) servedRequest {
 	out := servedRequest{operation: "Unknown", authMode: "signed"}
+
+	// PostObject: browser-form upload. Auth lives in the body (signed
+	// policy doc), not in any header or query param, so the request looks
+	// "unauthenticated" to both the SigV4 path and the anonymous fast-path.
+	// Branch off here so neither misroutes it.
+	if r.Method == http.MethodPost && isPostObjectRequest(r) {
+		route := ClassifyRoute(r, s.cfg.HostSuffixes)
+		if route.Bucket != "" && route.Key == "" {
+			return s.servePostObject(w, r, route, reqID)
+		}
+	}
 
 	// Anonymous fast-path: only consulted when (a) the request carries no
 	// SigV4 credentials at all, and (b) the cluster opt-in is on. Malformed
