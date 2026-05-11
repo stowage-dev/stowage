@@ -59,7 +59,12 @@ if ($env:STOWAGE_RELEASE_BASE) {
 function Test-DockerAvailable {
   if ($env:STOWAGE_NO_DOCKER -eq '1') { return $false }
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
-  & docker info *>$null
+  # Route the probe through cmd.exe so docker's stderr never enters the
+  # PowerShell pipeline. In PS 5.1 with ErrorActionPreference='Stop', native
+  # stderr is otherwise wrapped into a terminating NativeCommandError before
+  # *>$null can suppress it — e.g. when Docker Desktop is installed but the
+  # Linux engine pipe isn't up yet.
+  & cmd.exe /c "docker info >NUL 2>&1"
   return ($LASTEXITCODE -eq 0)
 }
 
@@ -96,6 +101,37 @@ $target   = Join-Path (Get-Location) 'stowage.exe'
 # Use TLS 1.2+ on older Windows.
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 
+# Invoke-WebRequest in Windows PowerShell 5.1 is known to drop large binary
+# downloads with "The connection was closed unexpectedly" against the GitHub
+# CDN. WebClient.DownloadFile streams to disk and survives this in practice;
+# retry on top covers the remaining transient cases.
+function Download-File {
+  param(
+    [Parameter(Mandatory)] [string] $Url,
+    [Parameter(Mandatory)] [string] $OutFile,
+    [int] $MaxAttempts = 3
+  )
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $wc = New-Object System.Net.WebClient
+    try {
+      $wc.Headers.Add('User-Agent', 'stowage-install')
+      $wc.DownloadFile($Url, $OutFile)
+      return
+    } catch {
+      $msg = $_.Exception.Message
+      if ($_.Exception.InnerException) { $msg = "$msg ($($_.Exception.InnerException.Message))" }
+      if ($attempt -ge $MaxAttempts) {
+        Fail "failed to download $Url after $MaxAttempts attempts: $msg"
+      }
+      $delay = [int][Math]::Pow(2, $attempt - 1)
+      Info "download attempt $attempt/$MaxAttempts failed: $msg; retrying in ${delay}s"
+      Start-Sleep -Seconds $delay
+    } finally {
+      $wc.Dispose()
+    }
+  }
+}
+
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("stowage-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
 try {
@@ -103,8 +139,8 @@ try {
   $tmpSums = Join-Path $tmpDir 'SHA256SUMS'
 
   Info "downloading $asset from $base"
-  Invoke-WebRequest -Uri $url     -OutFile $tmpBin  -UseBasicParsing
-  Invoke-WebRequest -Uri $sumsUrl -OutFile $tmpSums -UseBasicParsing
+  Download-File -Url $url     -OutFile $tmpBin
+  Download-File -Url $sumsUrl -OutFile $tmpSums
 
   $expected = $null
   foreach ($line in Get-Content -LiteralPath $tmpSums) {

@@ -53,27 +53,24 @@
 		return a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left';
 	}
 
-	function colExtras(c: Column<TData>): { hClass: string; cClass: string; mono: string } {
-		return {
-			hClass: c.headerClass ?? '',
-			cClass: c.cellClass ?? '',
-			mono: c.mono ? 'font-mono' : ''
-		};
+	// Precomputed per-column header metadata. Column definitions are static so
+	// this map is only rebuilt when column visibility changes.
+	type ColMeta = { hClass: string; label: string };
+	function colMeta(c: Column<TData>): ColMeta {
+		return { hClass: c.headerClass ?? '', label: typeof c.header === 'string' ? c.header : '' };
 	}
+	const colMetaMap = $derived(
+		new Map(table.getAllLeafColumns().map((c) => [c.id, colMeta(c.columnDef as Column<TData>)]))
+	);
 
-	function rowKeyHandler(r: Row<TData>): (e: KeyboardEvent) => void {
-		return (e: KeyboardEvent) => {
-			if (!onRowClick) return;
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				onRowClick(r, e);
-			}
-		};
-	}
+	// Base row class shared across all rows — computed once, not per-row.
+	const baseRowCls = $derived(
+		'row-divider ' + rowHeightCls + (onRowClick ? ' cursor-pointer hover:bg-stw-bg-hover' : '')
+	);
 </script>
 
 <div class="overflow-hidden rounded-lg border border-stw-border bg-stw-bg-panel {extraClass}">
-	<div class="stw-scroll {scrollClass || 'overflow-hidden'}">
+	<div class="stw-scroll {scrollClass ? `${scrollClass} h-full` : 'overflow-hidden'}">
 		<table class="w-full border-separate border-spacing-0 text-[13px]">
 			{#if caption}
 				<caption class="sr-only">{caption}</caption>
@@ -87,13 +84,12 @@
 							{@const col = h.column.columnDef as Column<TData>}
 							{@const sortable = h.column.getCanSort()}
 							{@const sorted = h.column.getIsSorted()}
-							{@const extras = colExtras(col)}
-							{@const headerLabel = typeof col.header === 'string' ? col.header : ''}
+							{@const meta = colMetaMap.get(h.column.id)!}
 							<th
 								scope="col"
 								class="px-3 text-[11.5px] font-medium tracking-[0.04em] text-stw-fg-mute uppercase {alignCls(
 									col.align
-								)} {extras.hClass}"
+								)} {meta.hClass}"
 							>
 								{#if h.isPlaceholder}
 									&nbsp;
@@ -109,7 +105,7 @@
 										class="focus-ring inline-flex cursor-pointer items-center gap-1.5 tracking-[0.04em] uppercase select-none hover:text-stw-fg"
 										onclick={h.column.getToggleSortingHandler()}
 									>
-										{headerLabel}
+										{meta.label}
 										{#if sorted === 'asc'}
 											<ChevronUp size={12} strokeWidth={1.7} />
 										{:else if sorted === 'desc'}
@@ -121,7 +117,7 @@
 										{/if}
 									</button>
 								{:else}
-									{headerLabel}
+									{meta.label}
 								{/if}
 							</th>
 						{/each}
@@ -131,16 +127,20 @@
 			<tbody>
 				{#each rows as r, i (r.id)}
 					{@const extra = rowClass?.(r) ?? ''}
-					{@const clickable = !!onRowClick}
 					<tr
-						class="row-divider {rowHeightCls} {clickable
-							? 'cursor-pointer hover:bg-stw-bg-hover'
-							: ''} {extra}"
-						onclick={clickable ? (e) => onRowClick(r, e) : undefined}
+						class="{baseRowCls} {extra}"
+						onclick={onRowClick ? (e) => onRowClick(r, e) : undefined}
 						ondblclick={ondblclick ? (e) => ondblclick(r, e) : undefined}
-						onkeydown={clickable ? rowKeyHandler(r) : undefined}
-						role={clickable ? 'button' : undefined}
-						tabindex={clickable ? 0 : undefined}
+						onkeydown={onRowClick
+							? (e: KeyboardEvent) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										onRowClick(r, e);
+									}
+								}
+							: undefined}
+						role={onRowClick ? 'button' : undefined}
+						tabindex={onRowClick ? 0 : undefined}
 					>
 						{@render row(r.original, { row: r, index: i })}
 					</tr>

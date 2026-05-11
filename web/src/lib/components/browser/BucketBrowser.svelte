@@ -43,6 +43,9 @@
 	import { bucketList } from '$lib/stores/buckets.svelte';
 	import type { Backend, BrowserItem, Bucket, BucketQuota, ListObjectsResult } from '$lib/types';
 
+	// Per-folder size cache persists across navigations within the same session.
+	const folderSizeCache = new Map<string, number>();
+
 	interface Props {
 		backend: Backend;
 		bucket: string;
@@ -158,44 +161,36 @@
 	});
 
 	$effect(() => {
-		// Recompute folder sizes whenever the underlying listing changes —
-		// after navigation, after refresh, and after mutations that bump
-		// `listing` via invalidateAll. Skip entirely when the bucket has
-		// the size-tracking toggle off; the server short-circuits with 409
-		// in that case and there's nothing useful to render.
+		// Reset folder sizes whenever the listing changes. Individual sizes are
+		// fetched lazily via onFolderVisible as rows scroll into the viewport.
 		void listing;
 		void sizeTracked;
 		untrack(() => {
 			folderSizes = {};
-			if (!sizeTracked) return;
-			void loadFolderSizes();
+			sizesGen++;
 		});
 	});
 
-	async function loadFolderSizes(): Promise<void> {
-		const gen = ++sizesGen;
-		const folders = allItems.filter((i) => i.kind === 'folder');
-		if (folders.length === 0) return;
-		const queue = folders.slice();
-		const concurrency = Math.min(4, queue.length);
-		const worker = async (): Promise<void> => {
-			while (queue.length > 0) {
-				if (gen !== sizesGen) return;
-				const f = queue.shift();
-				if (!f) return;
-				folderSizes = { ...folderSizes, [f.key]: 'loading' };
-				try {
-					const r = await api.prefixSize(backend.id, bucket, s3Prefix() + f.key);
-					if (gen !== sizesGen) return;
-					folderSizes = { ...folderSizes, [f.key]: r.bytes };
-				} catch (err) {
-					if (gen !== sizesGen) return;
-					folderSizes = { ...folderSizes, [f.key]: 'error' };
-					console.warn('prefix-size failed', f.key, err);
-				}
-			}
-		};
-		await Promise.all(Array.from({ length: concurrency }, worker));
+	async function loadOneFolderSize(key: string): Promise<void> {
+		if (!sizeTracked) return;
+		if (folderSizes[key] !== undefined) return;
+		const cached = folderSizeCache.get(key);
+		if (cached !== undefined) {
+			folderSizes = { ...folderSizes, [key]: cached };
+			return;
+		}
+		const gen = sizesGen;
+		folderSizes = { ...folderSizes, [key]: 'loading' };
+		try {
+			const r = await api.prefixSize(backend.id, bucket, s3Prefix() + key);
+			if (gen !== sizesGen) return;
+			folderSizeCache.set(key, r.bytes);
+			folderSizes = { ...folderSizes, [key]: r.bytes };
+		} catch (err) {
+			if (gen !== sizesGen) return;
+			folderSizes = { ...folderSizes, [key]: 'error' };
+			console.warn('prefix-size failed', key, err);
+		}
 	}
 
 	async function refreshAll(): Promise<void> {
@@ -708,6 +703,7 @@
 				onshare={(it) => onshare(it)}
 				onpreview={openItem}
 				ondownload={downloadOne}
+				onFolderVisible={loadOneFolderSize}
 			/>
 		{/if}
 
