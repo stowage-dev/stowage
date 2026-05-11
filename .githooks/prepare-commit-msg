@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# prepare-commit-msg hook — auto-appends a DCO Signed-off-by trailer.
+#
+# The trailer identity is the canonical one declared in AUTHORS:
+#   Damian van der Merwe <me@damianvandermerwe.com>
+#
+# When a different contributor lands, change SIGNOFF below (or replace
+# with `git interpret-trailers --trailer "Signed-off-by: $(git config
+# user.name) <$(git config user.email)>"` to track committer identity).
+#
+# Install via `make setup-hooks`, or `git config core.hooksPath .githooks`.
+
+set -eu
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Don't touch commit messages that didn't originate from a fresh commit:
+# merges carry their own structure; squash/fixup messages get rewritten
+# by the rebase machinery; templates and amends are the developer's
+# explicit choice. The DCO check still gates these via the bot or a
+# commit-msg hook if you add one — this hook is for the everyday case.
+case "$COMMIT_SOURCE" in
+    merge|squash|commit) exit 0 ;;
+esac
+
+SIGNOFF="Signed-off-by: Damian van der Merwe <me@damianvandermerwe.com>"
+
+# If the message already carries this exact sign-off (e.g. the user ran
+# `git commit -s` and their config matches, or a previous `--amend`
+# already added it), do nothing. We compare on the full trailer line so
+# a sign-off under a different identity doesn't suppress this one.
+if grep -qxF "$SIGNOFF" "$COMMIT_MSG_FILE"; then
+    exit 0
+fi
+
+# Append as a proper trailer so the line ends up in the conventional
+# trailer block, separated from the body by exactly one blank line. The
+# --in-place flag rewrites the file directly.
+git interpret-trailers --in-place --trailer "$SIGNOFF" "$COMMIT_MSG_FILE"
