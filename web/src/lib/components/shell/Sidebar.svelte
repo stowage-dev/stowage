@@ -21,9 +21,7 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
-	import FlatSidebar from './FlatSidebar.svelte';
 	import { theme, toggleTheme } from '$lib/stores/theme.svelte';
-	import { tweaks } from '$lib/stores/tweaks.svelte';
 	import { urlForRoute } from '$lib/route';
 	import { inferKind, backendHealth, BACKEND_KINDS } from '$lib/backend-kind';
 	import {
@@ -140,253 +138,249 @@
 
 	<!-- Body -->
 	<div class="sb-body stw-scroll">
-		{#if tweaks.sidebarStyle === 'flat'}
-			<FlatSidebar {route} {backends} {pins} {nav} />
-		{:else}
-			{#if isAdmin}
-				<button
-					type="button"
-					class="sb-row focus-ring"
-					class:active={route.type === 'admin-dashboard'}
-					onclick={() => nav({ type: 'admin-dashboard' })}
-				>
-					<span class="sb-row-ico"><Gauge size={15} strokeWidth={1.7} /></span>
-					<span class="sb-row-label">Dashboard</span>
-				</button>
-			{/if}
+		{#if isAdmin}
+			<button
+				type="button"
+				class="sb-row focus-ring"
+				class:active={route.type === 'admin-dashboard'}
+				onclick={() => nav({ type: 'admin-dashboard' })}
+			>
+				<span class="sb-row-ico"><Gauge size={15} strokeWidth={1.7} /></span>
+				<span class="sb-row-label">Dashboard</span>
+			</button>
+		{/if}
 
-			{#if pins.length > 0}
-				{@render sectionHeader('pinned', 'Pinned')}
-				{#if !sectionCollapsed.pinned}
-					<div class="sb-sec-body">
-						{#each pins as pin (pin.backend_id + '/' + pin.bucket)}
-							{@const active = isOnBucket(pin.backend_id, pin.bucket)}
-							<div class="sb-row-wrap">
-								<button
-									type="button"
-									class="sb-row focus-ring"
-									class:active
-									onclick={() =>
-										nav({
-											type: 'bucket',
-											backend: pin.backend_id,
-											bucket: pin.bucket,
-											prefix: []
-										})}
-								>
-									<span class="sb-row-ico sb-pinned-ico">
-										<Star size={12} strokeWidth={1.7} fill="currentColor" />
-									</span>
-									<span class="sb-row-label">{pin.bucket}</span>
-								</button>
-								<button
-									type="button"
-									class="pin active sb-trail-btn focus-ring"
-									aria-label="Unpin bucket"
-									title="Unpin bucket"
-									onclick={(e) => {
-										e.stopPropagation();
-										void togglePin(pin.backend_id, pin.bucket);
-									}}
-								>
-									<StarOff size={12} strokeWidth={1.7} />
-								</button>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			{/if}
-
-			{@render sectionHeader('backends', 'Backends')}
-			{#if !sectionCollapsed.backends}
+		{#if pins.length > 0}
+			{@render sectionHeader('pinned', 'Pinned')}
+			{#if !sectionCollapsed.pinned}
 				<div class="sb-sec-body">
-					{#if backends.length === 0}
-						<div class="sb-empty">No backends configured.</div>
-					{/if}
-					{#each backends as b (b.id)}
-						{@const open = !backendCollapsed[b.id]}
-						{@const kind = inferKind(b)}
-						{@const kindInfo = BACKEND_KINDS[kind] ?? BACKEND_KINDS.generic}
-						{@const health = backendHealth(b)}
-						<button
-							type="button"
-							class="sb-tree-row sb-row focus-ring"
-							class:active={isOnBackend(b.id)}
-							class:collapsed={!open}
-							onclick={() => {
-								toggleBackend(b.id);
-								nav({ type: 'backend', backend: b.id });
-							}}
-						>
-							<span class="sb-tree-toggle">
-								<ChevronRight size={12} strokeWidth={2} />
-							</span>
-							<span class="sb-backend-mark" aria-hidden="true">{kindInfo.letter}</span>
-							<span class="sb-row-label">{b.name}</span>
-							{#if health.state === 'ok'}
-								<span class="ok sb-status-dot" aria-label="Healthy"></span>
-							{:else if health.state === 'warn'}
-								<span class="warn sb-status-dot" aria-label="Degraded"></span>
-							{:else}
-								<Tooltip text={health.message ?? 'Unhealthy'}>
-									<span class="err sb-status-dot" aria-label="Unhealthy"></span>
-								</Tooltip>
-							{/if}
-						</button>
-						{#if open}
-							{@const bs = bucketState(b.id)}
-							<div class="sb-tree-children">
-								{#if bs.status === 'ok'}
-									{#each bs.buckets as bk (bk.name)}
-										{@const active = isOnBucket(b.id, bk.name)}
-										<div class="sb-row-wrap">
-											<button
-												type="button"
-												class="sb-row sb-bucket-row focus-ring"
-												class:active
-												onclick={() =>
-													nav({
-														type: 'bucket',
-														backend: b.id,
-														bucket: bk.name,
-														prefix: []
-													})}
-											>
-												<span class="sb-row-ico"><Folder size={13} strokeWidth={1.7} /></span>
-												<span class="sb-row-label">{bk.name}</span>
-											</button>
-											<button
-												type="button"
-												class="pin sb-trail-btn focus-ring"
-												class:active={isPinned(b.id, bk.name)}
-												aria-label={isPinned(b.id, bk.name) ? 'Unpin bucket' : 'Pin bucket'}
-												title={isPinned(b.id, bk.name) ? 'Unpin bucket' : 'Pin bucket'}
-												onclick={(e) => {
-													e.stopPropagation();
-													void togglePin(b.id, bk.name);
-												}}
-											>
-												{#if isPinned(b.id, bk.name)}
-													<Star size={12} strokeWidth={1.7} fill="currentColor" />
-												{:else}
-													<Star size={12} strokeWidth={1.7} />
-												{/if}
-											</button>
-											{#if isAdmin}
-												<button
-													type="button"
-													class="settings sb-trail-btn focus-ring"
-													aria-label="Bucket settings"
-													title="Bucket settings"
-													onclick={(e) => {
-														e.stopPropagation();
-														goto(
-															`/b/${encodeURIComponent(b.id)}/${encodeURIComponent(bk.name)}/settings`
-														);
-													}}
-												>
-													<Settings size={12} strokeWidth={1.7} />
-												</button>
-											{/if}
-										</div>
-									{/each}
-									{#if bs.buckets.length === 0}
-										<div class="nested sb-empty">No buckets</div>
-									{/if}
-								{:else if bs.status === 'error'}
-									<div
-										role="button"
-										tabindex="0"
-										class="nested clickable sb-error"
-										title="Click to retry · {bs.message}"
-										onclick={(e) => {
-											e.stopPropagation();
-											refreshBuckets(b.id);
-										}}
-										onkeydown={(e) => {
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
-												refreshBuckets(b.id);
-											}
-										}}
-									>
-										{bs.message}
-									</div>
-								{:else}
-									<div class="nested sb-empty">Loading…</div>
-								{/if}
-							</div>
-						{/if}
+					{#each pins as pin (pin.backend_id + '/' + pin.bucket)}
+						{@const active = isOnBucket(pin.backend_id, pin.bucket)}
+						<div class="sb-row-wrap">
+							<button
+								type="button"
+								class="sb-row focus-ring"
+								class:active
+								onclick={() =>
+									nav({
+										type: 'bucket',
+										backend: pin.backend_id,
+										bucket: pin.bucket,
+										prefix: []
+									})}
+							>
+								<span class="sb-row-ico sb-pinned-ico">
+									<Star size={12} strokeWidth={1.7} fill="currentColor" />
+								</span>
+								<span class="sb-row-label">{pin.bucket}</span>
+							</button>
+							<button
+								type="button"
+								class="pin active sb-trail-btn focus-ring"
+								aria-label="Unpin bucket"
+								title="Unpin bucket"
+								onclick={(e) => {
+									e.stopPropagation();
+									void togglePin(pin.backend_id, pin.bucket);
+								}}
+							>
+								<StarOff size={12} strokeWidth={1.7} />
+							</button>
+						</div>
 					{/each}
 				</div>
 			{/if}
+		{/if}
 
-			{@render sectionHeader('workspace', 'Workspace')}
-			{#if !sectionCollapsed.workspace}
+		{@render sectionHeader('backends', 'Backends')}
+		{#if !sectionCollapsed.backends}
+			<div class="sb-sec-body">
+				{#if backends.length === 0}
+					<div class="sb-empty">No backends configured.</div>
+				{/if}
+				{#each backends as b (b.id)}
+					{@const open = !backendCollapsed[b.id]}
+					{@const kind = inferKind(b)}
+					{@const kindInfo = BACKEND_KINDS[kind] ?? BACKEND_KINDS.generic}
+					{@const health = backendHealth(b)}
+					<button
+						type="button"
+						class="sb-tree-row sb-row focus-ring"
+						class:active={isOnBackend(b.id)}
+						class:collapsed={!open}
+						onclick={() => {
+							toggleBackend(b.id);
+							nav({ type: 'backend', backend: b.id });
+						}}
+					>
+						<span class="sb-tree-toggle">
+							<ChevronRight size={12} strokeWidth={2} />
+						</span>
+						<span class="sb-backend-mark" aria-hidden="true">{kindInfo.letter}</span>
+						<span class="sb-row-label">{b.name}</span>
+						{#if health.state === 'ok'}
+							<span class="ok sb-status-dot" aria-label="Healthy"></span>
+						{:else if health.state === 'warn'}
+							<span class="warn sb-status-dot" aria-label="Degraded"></span>
+						{:else}
+							<Tooltip text={health.message ?? 'Unhealthy'}>
+								<span class="err sb-status-dot" aria-label="Unhealthy"></span>
+							</Tooltip>
+						{/if}
+					</button>
+					{#if open}
+						{@const bs = bucketState(b.id)}
+						<div class="sb-tree-children">
+							{#if bs.status === 'ok'}
+								{#each bs.buckets as bk (bk.name)}
+									{@const active = isOnBucket(b.id, bk.name)}
+									<div class="sb-row-wrap">
+										<button
+											type="button"
+											class="sb-row sb-bucket-row focus-ring"
+											class:active
+											onclick={() =>
+												nav({
+													type: 'bucket',
+													backend: b.id,
+													bucket: bk.name,
+													prefix: []
+												})}
+										>
+											<span class="sb-row-ico"><Folder size={13} strokeWidth={1.7} /></span>
+											<span class="sb-row-label">{bk.name}</span>
+										</button>
+										<button
+											type="button"
+											class="pin sb-trail-btn focus-ring"
+											class:active={isPinned(b.id, bk.name)}
+											aria-label={isPinned(b.id, bk.name) ? 'Unpin bucket' : 'Pin bucket'}
+											title={isPinned(b.id, bk.name) ? 'Unpin bucket' : 'Pin bucket'}
+											onclick={(e) => {
+												e.stopPropagation();
+												void togglePin(b.id, bk.name);
+											}}
+										>
+											{#if isPinned(b.id, bk.name)}
+												<Star size={12} strokeWidth={1.7} fill="currentColor" />
+											{:else}
+												<Star size={12} strokeWidth={1.7} />
+											{/if}
+										</button>
+										{#if isAdmin}
+											<button
+												type="button"
+												class="settings sb-trail-btn focus-ring"
+												aria-label="Bucket settings"
+												title="Bucket settings"
+												onclick={(e) => {
+													e.stopPropagation();
+													goto(
+														`/b/${encodeURIComponent(b.id)}/${encodeURIComponent(bk.name)}/settings`
+													);
+												}}
+											>
+												<Settings size={12} strokeWidth={1.7} />
+											</button>
+										{/if}
+									</div>
+								{/each}
+								{#if bs.buckets.length === 0}
+									<div class="nested sb-empty">No buckets</div>
+								{/if}
+							{:else if bs.status === 'error'}
+								<div
+									role="button"
+									tabindex="0"
+									class="nested clickable sb-error"
+									title="Click to retry · {bs.message}"
+									onclick={(e) => {
+										e.stopPropagation();
+										refreshBuckets(b.id);
+									}}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											refreshBuckets(b.id);
+										}
+									}}
+								>
+									{bs.message}
+								</div>
+							{:else}
+								<div class="nested sb-empty">Loading…</div>
+							{/if}
+						</div>
+					{/if}
+				{/each}
+			</div>
+		{/if}
+
+		{@render sectionHeader('workspace', 'Workspace')}
+		{#if !sectionCollapsed.workspace}
+			<div class="sb-sec-body">
+				<button
+					type="button"
+					class="sb-row focus-ring"
+					class:active={route.type === 'shares'}
+					onclick={() => nav({ type: 'shares' })}
+				>
+					<span class="sb-row-ico"><Link size={15} strokeWidth={1.7} /></span>
+					<span class="sb-row-label">Shares</span>
+				</button>
+				<button
+					type="button"
+					class="sb-row focus-ring"
+					class:active={route.type === 'me-s3-credentials'}
+					onclick={() => nav({ type: 'me-s3-credentials' })}
+				>
+					<span class="sb-row-ico"><KeyRound size={15} strokeWidth={1.7} /></span>
+					<span class="sb-row-label">My credentials</span>
+				</button>
+			</div>
+		{/if}
+
+		{#if isAdmin}
+			{@render sectionHeader('admin', 'Admin')}
+			{#if !sectionCollapsed.admin}
 				<div class="sb-sec-body">
 					<button
 						type="button"
 						class="sb-row focus-ring"
-						class:active={route.type === 'shares'}
-						onclick={() => nav({ type: 'shares' })}
+						class:active={route.type === 'admin-users'}
+						onclick={() => nav({ type: 'admin-users' })}
 					>
-						<span class="sb-row-ico"><Link size={15} strokeWidth={1.7} /></span>
-						<span class="sb-row-label">Shares</span>
+						<span class="sb-row-ico"><Users size={15} strokeWidth={1.7} /></span>
+						<span class="sb-row-label">Users</span>
 					</button>
 					<button
 						type="button"
 						class="sb-row focus-ring"
-						class:active={route.type === 'me-s3-credentials'}
-						onclick={() => nav({ type: 'me-s3-credentials' })}
+						class:active={route.type === 'admin-audit'}
+						onclick={() => nav({ type: 'admin-audit' })}
 					>
-						<span class="sb-row-ico"><KeyRound size={15} strokeWidth={1.7} /></span>
-						<span class="sb-row-label">My credentials</span>
+						<span class="sb-row-ico"><Activity size={15} strokeWidth={1.7} /></span>
+						<span class="sb-row-label">Audit log</span>
+					</button>
+					<button
+						type="button"
+						class="sb-row focus-ring"
+						class:active={route.type === 'backends'}
+						onclick={() => nav({ type: 'backends' })}
+					>
+						<span class="sb-row-ico"><Database size={15} strokeWidth={1.7} /></span>
+						<span class="sb-row-label">Backends</span>
+					</button>
+					<button
+						type="button"
+						class="sb-row focus-ring"
+						class:active={route.type === 'admin-s3-proxy'}
+						onclick={() => nav({ type: 'admin-s3-proxy' })}
+					>
+						<span class="sb-row-ico"><ServerCog size={15} strokeWidth={1.7} /></span>
+						<span class="sb-row-label">S3 Proxy</span>
 					</button>
 				</div>
-			{/if}
-
-			{#if isAdmin}
-				{@render sectionHeader('admin', 'Admin')}
-				{#if !sectionCollapsed.admin}
-					<div class="sb-sec-body">
-						<button
-							type="button"
-							class="sb-row focus-ring"
-							class:active={route.type === 'admin-users'}
-							onclick={() => nav({ type: 'admin-users' })}
-						>
-							<span class="sb-row-ico"><Users size={15} strokeWidth={1.7} /></span>
-							<span class="sb-row-label">Users</span>
-						</button>
-						<button
-							type="button"
-							class="sb-row focus-ring"
-							class:active={route.type === 'admin-audit'}
-							onclick={() => nav({ type: 'admin-audit' })}
-						>
-							<span class="sb-row-ico"><Activity size={15} strokeWidth={1.7} /></span>
-							<span class="sb-row-label">Audit log</span>
-						</button>
-						<button
-							type="button"
-							class="sb-row focus-ring"
-							class:active={route.type === 'backends'}
-							onclick={() => nav({ type: 'backends' })}
-						>
-							<span class="sb-row-ico"><Database size={15} strokeWidth={1.7} /></span>
-							<span class="sb-row-label">Backends</span>
-						</button>
-						<button
-							type="button"
-							class="sb-row focus-ring"
-							class:active={route.type === 'admin-s3-proxy'}
-							onclick={() => nav({ type: 'admin-s3-proxy' })}
-						>
-							<span class="sb-row-ico"><ServerCog size={15} strokeWidth={1.7} /></span>
-							<span class="sb-row-label">S3 Proxy</span>
-						</button>
-					</div>
-				{/if}
 			{/if}
 		{/if}
 	</div>

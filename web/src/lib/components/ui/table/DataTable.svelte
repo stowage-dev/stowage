@@ -102,7 +102,7 @@
 								{:else if sortable}
 									<button
 										type="button"
-										class="focus-ring inline-flex cursor-pointer items-center gap-1.5 tracking-[0.04em] uppercase select-none hover:text-stw-fg"
+										class="inline-flex cursor-pointer items-center gap-1.5 tracking-[0.04em] uppercase focus-ring select-none hover:text-stw-fg"
 										onclick={h.column.getToggleSortingHandler()}
 									>
 										{meta.label}

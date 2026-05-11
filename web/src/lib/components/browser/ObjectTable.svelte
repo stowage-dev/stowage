@@ -8,13 +8,11 @@
 	import ObjectIcon from './ObjectIcon.svelte';
 	import { bytes } from '$lib/format';
 	import type { BrowserItem } from '$lib/types';
-	import type { Density } from '$lib/stores/tweaks.svelte';
 
 	type FolderSize = number | 'loading' | 'error';
 
 	interface Props {
 		items: BrowserItem[];
-		density?: Density;
 		selected: string[];
 		folderSizes?: Record<string, FolderSize>;
 		setSelected: (s: string[]) => void;
@@ -27,7 +25,6 @@
 
 	let {
 		items,
-		density = 'compact',
 		selected,
 		folderSizes = {},
 		setSelected,
@@ -67,9 +64,6 @@
 			}
 		};
 	}
-
-	const cellPadCls = $derived(density === 'compact' ? 'px-2' : 'px-3');
-	const cellPadLCls = $derived(density === 'compact' ? 'pl-2' : 'pl-3');
 
 	let anchor = $state<string | null>(null);
 	$effect(() => {
@@ -173,7 +167,7 @@
 <DataTable
 	table={objectTable.table}
 	stickyHeader
-	{density}
+	density="roomy"
 	scrollClass="overflow-auto"
 	class="flex-1 rounded-none border-0"
 	emptyText=""
@@ -195,7 +189,7 @@
 				/>
 			</span>
 		</td>
-		<td class={cellPadCls + ' align-middle'}>
+		<td class="px-3 align-middle">
 			<span class="inline-flex items-center gap-2.5 align-middle">
 				<ObjectIcon kind={o.kind} />
 				<span
@@ -219,19 +213,16 @@
 				</span>
 			</span>
 		</td>
-		<td
-			class={cellPadCls +
-				' text-right align-middle font-mono text-[12px] text-stw-fg-mute tabular-nums'}
-		>
+		<td class="px-3 text-right align-middle font-mono text-[12px] text-stw-fg-mute tabular-nums">
 			{o.kind === 'folder' ? folderSizeText(o.key) : bytes(o.size)}
 		</td>
-		<td class={cellPadCls + ' align-middle font-mono text-[12px] text-stw-fg-mute'}>
+		<td class="px-3 align-middle font-mono text-[12px] text-stw-fg-mute">
 			{o.modified ? new Date(o.modified).toLocaleString() : '—'}
 		</td>
-		<td class={cellPadCls + ' align-middle font-mono text-[12px] text-stw-fg-mute'}>
+		<td class="px-3 align-middle font-mono text-[12px] text-stw-fg-mute">
 			{o.ct || (o.kind === 'folder' ? 'folder' : '—')}
 		</td>
-		<td class={cellPadCls + ' text-right align-middle'} onclick={(e) => e.stopPropagation()}>
+		<td class="px-3 text-right align-middle" onclick={(e) => e.stopPropagation()}>
 			{#if o.kind !== 'folder'}
 				<span
 					class="inline-flex gap-0.5 transition-opacity duration-[120ms] group-hover:opacity-100 {sel
