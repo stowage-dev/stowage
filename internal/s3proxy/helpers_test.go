@@ -158,6 +158,33 @@ func newTestServer(t *testing.T, ups *httptest.Server, vc *VirtualCredential) *h
 	return httptest.NewServer(srv)
 }
 
+// newTestProxyWithQuota mirrors newTestServer but lets a test inject a
+// QuotaEnforcer. Used by post-object tests to exercise quota rejection
+// without standing up the full quotas service.
+func newTestProxyWithQuota(t *testing.T, ups *httptest.Server, vc *VirtualCredential, q QuotaEnforcer) *httptest.Server {
+	t.Helper()
+	src := &fakeSource{
+		byAKID: map[string]*VirtualCredential{vc.AccessKeyID: vc},
+		byAnon: map[string]*AnonymousBinding{},
+	}
+	br := NewBackendResolver(&stubBackendLookup{endpointURL: ups.URL})
+	srv := NewServer(Config{
+		Source:        src,
+		Backends:      br,
+		Limiter:       NewLimiter(0, 0),
+		IPLimiter:     NewIPLimiter(0),
+		Metrics:       NewMetrics(prometheus.NewRegistry()),
+		Log:           testr.New(t),
+		HostSuffixes:  nil,
+		BucketCreated: time.Now(),
+		Quotas:        q,
+		AdminCredsOverride: func(_ context.Context, _ BackendSpec) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "admin", SecretAccessKey: "secret"}, nil
+		},
+	})
+	return httptest.NewServer(srv)
+}
+
 // newAnonTestServer is newTestServer with the anonymous fast-path enabled
 // and an empty credential map (only anonymous bindings matter).
 func newAnonTestServer(t *testing.T, ups *httptest.Server, anon map[string]*AnonymousBinding, enabled bool) *httptest.Server {
