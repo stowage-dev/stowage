@@ -21,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/go-logr/logr/testr"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -196,7 +199,91 @@ func TestPostObject_SuccessActionStatus201(t *testing.T) {
 	require.NoError(t, xml.NewDecoder(resp.Body).Decode(&pr))
 	require.Equal(t, testPostBucket, pr.Bucket)
 	require.Equal(t, "keyname", pr.Key)
-	require.NotEmpty(t, pr.Location)
+	// Location should point back at the proxy (the inbound host),
+	// not at the upstream backend.
+	proxyHost, _ := url.Parse(proxy.URL)
+	require.Equal(t, proxy.URL+"/"+testPostBucket+"/keyname", pr.Location,
+		"proxy URL %s; location %s", proxyHost.Host, pr.Location)
+}
+
+func TestPostObject_Location_HonorsXForwardedProto(t *testing.T) {
+	ups := httptest.NewServer(newUpstream())
+	defer ups.Close()
+	proxy := newTestServer(t, ups, newPostCred())
+	defer proxy.Close()
+
+	form := buildSignedPostForm(t, testPostAKID, testPostSecret, testPostBucket,
+		"k", []string{
+			`{"bucket":"` + testPostBucket + `"}`,
+			`{"key":"k"}`,
+			`{"success_action_status":"201"}`,
+		},
+		map[string]string{"success_action_status": "201"},
+		[]byte("x"))
+
+	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/"+testPostBucket, form.body)
+	req.Header.Set("Content-Type", form.contentType)
+	// Simulate a TLS-terminating ingress in front of the proxy: the
+	// inbound TCP connection is plain HTTP but the client used HTTPS.
+	req.Header.Set("X-Forwarded-Proto", "https")
+	// Pretend the client reached us at a public hostname.
+	req.Host = "uploads.example.com"
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var pr postObjectResponse
+	require.NoError(t, xml.NewDecoder(resp.Body).Decode(&pr))
+	require.Equal(t, "https://uploads.example.com/"+testPostBucket+"/k", pr.Location)
+}
+
+func TestPostObject_Location_VirtualHosted(t *testing.T) {
+	ups := httptest.NewServer(newUpstream())
+	defer ups.Close()
+	// Configure the proxy with a host suffix so b.uploads.test routes
+	// as bucket=b virtual-hosted.
+	src := &fakeSource{
+		byAKID: map[string]*VirtualCredential{testPostAKID: newPostCred()},
+		byAnon: map[string]*AnonymousBinding{},
+	}
+	src.byAKID[testPostAKID].BucketScopes = []BucketScope{{BucketName: "b", BackendName: testBackend}}
+	br := NewBackendResolver(&stubBackendLookup{endpointURL: ups.URL})
+	srv := NewServer(Config{
+		Source:        src,
+		Backends:      br,
+		Limiter:       NewLimiter(0, 0),
+		IPLimiter:     NewIPLimiter(0),
+		Metrics:       NewMetrics(prometheus.NewRegistry()),
+		Log:           testr.New(t),
+		HostSuffixes:  []string{"uploads.test"},
+		BucketCreated: time.Now(),
+		AdminCredsOverride: func(_ context.Context, _ BackendSpec) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "admin", SecretAccessKey: "secret"}, nil
+		},
+	})
+	proxy := httptest.NewServer(srv)
+	defer proxy.Close()
+
+	form := buildSignedPostForm(t, testPostAKID, testPostSecret, "b",
+		"file.bin", []string{
+			`{"bucket":"b"}`,
+			`{"key":"file.bin"}`,
+			`{"success_action_status":"201"}`,
+		},
+		map[string]string{"success_action_status": "201"},
+		[]byte("x"))
+
+	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/", form.body)
+	req.Header.Set("Content-Type", form.contentType)
+	req.Host = "b.uploads.test"
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var pr postObjectResponse
+	require.NoError(t, xml.NewDecoder(resp.Body).Decode(&pr))
+	require.Equal(t, "http://b.uploads.test/file.bin", pr.Location,
+		"virtual-hosted location should be host-only, no bucket prefix in path")
 }
 
 func TestPostObject_SuccessActionRedirect(t *testing.T) {
@@ -480,9 +567,10 @@ func TestPostObject_FileTooLarge(t *testing.T) {
 }
 
 func TestPostObject_FileTooSmall(t *testing.T) {
-	ups := httptest.NewServer(newUpstream())
-	defer ups.Close()
-	proxy := newTestServer(t, ups, newPostCred())
+	ups := newUpstream()
+	upsSrv := httptest.NewServer(ups)
+	defer upsSrv.Close()
+	proxy := newTestServer(t, upsSrv, newPostCred())
 	defer proxy.Close()
 
 	// Policy requires min 16; send 4.
@@ -501,6 +589,12 @@ func TestPostObject_FileTooSmall(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	// The orphan should have been deleted upstream after the failure.
+	ups.mu.Lock()
+	defer ups.mu.Unlock()
+	_, exists := ups.objs[testPostBucket+"/k"]
+	require.False(t, exists, "undersized object should be cleaned up upstream")
 }
 
 func TestPostObject_ContentTypeForwardedUpstream(t *testing.T) {

@@ -278,16 +278,31 @@ func (s *Server) servePostObject(w http.ResponseWriter, r *http.Request, route R
 	defer resp.Body.Close()
 
 	// Now we know the actual file size; enforce the policy's lower bound.
-	// The upload already committed — for v1 we surface the violation in
-	// the response and audit; cleanup of the orphan is a TODO.
+	// The upload already committed — best-effort delete the orphan so
+	// undersize uploads don't leave junk in the bucket. If cleanup fails
+	// we keep the client-facing error but log loud enough for an
+	// operator to notice; the next reconciliation/quota scan will
+	// surface the orphan.
 	if policy.HasContentLengthRange() && counter.total < policy.ContentLengthMin {
 		writeS3Error(w, http.StatusBadRequest, "EntityTooSmall",
-			fmt.Sprintf("file size %d below policy min %d (object was created and is now orphaned)", counter.total, policy.ContentLengthMin),
+			fmt.Sprintf("file size %d below policy min %d", counter.total, policy.ContentLengthMin),
 			r.URL.Path, reqID)
 		out.status, out.result = http.StatusBadRequest, "file-too-small"
-		s.cfg.Log.Info("post-object min violation",
-			"backend", vc.BackendName, "bucket", route.Bucket, "key", key,
-			"bytes", counter.total, "min", policy.ContentLengthMin, "request_id", reqID)
+		// resp.Body must be drained before another request reuses the
+		// connection; do that before we issue the DELETE so the same
+		// keep-alive can carry it.
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		if delErr := s.deleteUpstreamObject(r.Context(), backendURL, vc.BackendName, spec, route.Bucket, key); delErr != nil {
+			s.cfg.Log.Info("post-object orphan cleanup failed",
+				"backend", vc.BackendName, "bucket", route.Bucket, "key", key,
+				"bytes", counter.total, "min", policy.ContentLengthMin,
+				"cleanup_err", delErr.Error(), "request_id", reqID)
+		} else {
+			s.cfg.Log.Info("post-object min violation; orphan cleaned up",
+				"backend", vc.BackendName, "bucket", route.Bucket, "key", key,
+				"bytes", counter.total, "min", policy.ContentLengthMin, "request_id", reqID)
+		}
 		return out
 	}
 
@@ -304,7 +319,7 @@ func (s *Server) servePostObject(w http.ResponseWriter, r *http.Request, route R
 	// the upstream PUT's empty body to the client.
 	_, _ = io.Copy(io.Discard, resp.Body)
 
-	status := writePostSuccess(w, route.Bucket, key, etag, versionID, fields, redirect, reqID, backendURL)
+	status := writePostSuccess(w, route, key, etag, versionID, fields, redirect, r)
 	out.status, out.result = status, "ok"
 
 	if s.cfg.Quotas != nil && counter.total > 0 {
@@ -443,6 +458,42 @@ func (s *Server) buildPostUpstream(ctx context.Context, backendURL *url.URL, buc
 	return req, nil
 }
 
+// deleteUpstreamObject issues a best-effort signed DELETE for an
+// already-committed object. Used to clean up the orphan a post-hoc
+// content-length-range min violation leaves behind. Returns the first
+// error encountered — caller decides whether to surface or log it.
+func (s *Server) deleteUpstreamObject(ctx context.Context, backendURL *url.URL, backendName string, spec BackendSpec, bucket, key string) error {
+	outURL := *backendURL
+	basePath := strings.TrimRight(outURL.Path, "/")
+	outURL.Path = basePath + BuildOutboundPath(bucket, key)
+	outURL.RawPath = basePath + BuildOutboundRawPath(bucket, key)
+	outURL.RawQuery = ""
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, outURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("build delete: %w", err)
+	}
+	req.Header = make(http.Header)
+	req.Header.Set("Host", backendURL.Host)
+	req.Host = backendURL.Host
+	if err := s.signOutbound(ctx, req, backendName, spec); err != nil {
+		return fmt.Errorf("sign delete: %w", err)
+	}
+	resp, err := s.transport.RoundTrip(req)
+	if err != nil {
+		return fmt.Errorf("send delete: %w", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound {
+		// 404 is fine — the object never made it upstream (e.g. backend
+		// rejected the PUT after partial commit). Any other 4xx/5xx is
+		// a real failure worth logging.
+		return fmt.Errorf("delete returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // postObjectResponse is the body S3 returns for success_action_status=201.
 type postObjectResponse struct {
 	XMLName  xml.Name `xml:"PostResponse"`
@@ -455,11 +506,11 @@ type postObjectResponse struct {
 // writePostSuccess emits the response per the form's success_action_*
 // fields. Precedence: redirect > status > default (204).
 //
-// The Location URL is built from the backend's host because we don't
-// know what front-end hostname the client used to reach us — and the
-// existing Server config doesn't carry a public-base-URL field. Callers
-// who need a stable Location should set success_action_redirect.
-func writePostSuccess(w http.ResponseWriter, bucket, key, etag, versionID string, fields map[string]string, redirect *url.URL, reqID string, backendURL *url.URL) int {
+// The 201 Location URL is built from the inbound request's Host and
+// scheme so it matches the URL the client actually reached the proxy on.
+// X-Forwarded-Proto is honored on plain-HTTP inbound requests (typical
+// when a TLS-terminating ingress sits in front of stowage).
+func writePostSuccess(w http.ResponseWriter, route RouteInfo, key, etag, versionID string, fields map[string]string, redirect *url.URL, r *http.Request) int {
 	if etag != "" {
 		w.Header().Set("ETag", etag)
 	}
@@ -469,7 +520,7 @@ func writePostSuccess(w http.ResponseWriter, bucket, key, etag, versionID string
 
 	if redirect != nil {
 		q := redirect.Query()
-		q.Set("bucket", bucket)
+		q.Set("bucket", route.Bucket)
 		q.Set("key", key)
 		if etag != "" {
 			// AWS strips the surrounding double-quotes in the query value.
@@ -490,10 +541,9 @@ func writePostSuccess(w http.ResponseWriter, bucket, key, etag, versionID string
 	case "201":
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusCreated)
-		loc := buildObjectLocation(backendURL, bucket, key)
 		_ = xml.NewEncoder(w).Encode(postObjectResponse{
-			Location: loc,
-			Bucket:   bucket,
+			Location: inboundObjectLocation(r, route, key),
+			Bucket:   route.Bucket,
 			Key:      key,
 			ETag:     etag,
 		})
@@ -506,17 +556,32 @@ func writePostSuccess(w http.ResponseWriter, bucket, key, etag, versionID string
 	}
 }
 
-// buildObjectLocation returns the URL the client would use to GET the
-// object. We can't synthesize the inbound public hostname here, so we
-// fall back to the backend's host — it's wrong for proxied deployments
-// but predictable, and clients that care set success_action_redirect.
-func buildObjectLocation(backendURL *url.URL, bucket, key string) string {
-	if backendURL == nil {
-		return "/" + bucket + "/" + key
+// inboundObjectLocation builds the public URL of the just-uploaded
+// object as it would be addressed against the same proxy endpoint the
+// client just POSTed to. Scheme honors X-Forwarded-Proto when the
+// inbound connection is plain HTTP (the common case behind an ingress);
+// otherwise it tracks r.TLS.
+//
+// Path layout follows the inbound addressing style: virtual-hosted
+// requests put the bucket in the host, so the URL path is just the key;
+// path-style requests prefix the path with the bucket.
+func inboundObjectLocation(r *http.Request, route RouteInfo, key string) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	} else if xp := strings.ToLower(r.Header.Get("X-Forwarded-Proto")); xp == "https" {
+		scheme = "https"
 	}
-	loc := *backendURL
-	loc.Path = strings.TrimRight(loc.Path, "/") + BuildOutboundPath(bucket, key)
-	loc.RawPath = ""
-	loc.RawQuery = ""
+	host := r.Host
+	loc := &url.URL{Scheme: scheme, Host: host}
+	if route.PathStyle {
+		loc.Path = BuildOutboundPath(route.Bucket, key)
+		loc.RawPath = BuildOutboundRawPath(route.Bucket, key)
+	} else {
+		loc.Path = "/" + key
+		// awsKeyEscape preserves slashes inside the key while percent-encoding
+		// reserved characters per AWS SigV4 canonical-URI rules.
+		loc.RawPath = "/" + awsKeyEscape(key)
+	}
 	return loc.String()
 }

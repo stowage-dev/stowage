@@ -98,6 +98,14 @@ type Config struct {
 	// a real object-store backend without standing up stowage's full
 	// backend registry.
 	AdminCredsOverride func(context.Context, BackendSpec) (aws.Credentials, error)
+
+	// CORS, when non-nil, enables browser-friendly CORS support. The
+	// proxy answers preflight OPTIONS for allowed origins and decorates
+	// non-preflight responses with Access-Control-Allow-Origin /
+	// Expose-Headers. Required for browser-form POST Object uploads
+	// from a different origin than the proxy. Leave nil to preserve
+	// the pre-CORS behavior (OPTIONS falls through to a 4xx).
+	CORS *CORSConfig
 }
 
 // Server implements http.Handler.
@@ -161,6 +169,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Metrics.Inflight.Inc()
 	defer s.cfg.Metrics.Inflight.Dec()
 	s.cfg.Metrics.CacheSize.Set(float64(s.cfg.Source.Size()))
+
+	// CORS preflight: answer and short-circuit before any auth or
+	// dispatch logic runs. handlePreflight returns false for
+	// non-preflight OPTIONS or disallowed origins; those flow through
+	// to the regular path (and will 4xx, same as before CORS support).
+	if handlePreflight(s.cfg.CORS, w, r) {
+		s.cfg.Metrics.Requests.WithLabelValues(r.Method, "CORSPreflight", strconv.Itoa(http.StatusNoContent), "ok", "cors").Inc()
+		return
+	}
+	// Echo Origin on every actual response so cross-origin clients can
+	// read it. Safe to call unconditionally — no-op when CORS is off or
+	// the origin isn't allowed.
+	decorateCORS(s.cfg.CORS, w, r)
 
 	out := s.serve(w, r, reqID)
 	elapsed := time.Since(start).Seconds()
