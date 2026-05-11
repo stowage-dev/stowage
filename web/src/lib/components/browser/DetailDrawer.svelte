@@ -222,11 +222,11 @@
 	</div>
 {/snippet}
 
-<div role="presentation" onclick={onclose} class="absolute inset-0 z-[1] bg-transparent"></div>
+<div role="presentation" onclick={onclose} class="absolute inset-0 z-[15] bg-transparent"></div>
 <div
 	role="dialog"
 	aria-label="Object details"
-	class="absolute top-0 right-0 bottom-0 z-[2] flex w-[min(560px,max(70vw,320px))] max-w-full animate-[stw-slide-in-right_180ms_cubic-bezier(0.4,0,0.2,1)] flex-col border-l border-stw-border bg-stw-bg-panel shadow-stw-lg"
+	class="absolute top-0 right-0 bottom-0 z-20 flex w-[min(560px,max(70vw,320px))] max-w-full animate-[stw-slide-in-right_180ms_cubic-bezier(0.4,0,0.2,1)] flex-col border-l border-stw-border bg-stw-bg-panel shadow-stw-lg"
 >
 	<header class="flex h-[44px] items-center gap-2 border-b border-stw-border px-3.5">
 		<ObjectIcon kind={item.kind} />

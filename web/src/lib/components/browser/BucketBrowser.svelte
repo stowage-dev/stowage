@@ -17,7 +17,6 @@
 	} from 'lucide-svelte';
 	import { untrack } from 'svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import Segmented from '$lib/components/ui/Segmented.svelte';
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import BackendMark from '$lib/components/ui/BackendMark.svelte';
 	import Banner from '$lib/components/ui/Banner.svelte';
@@ -30,7 +29,6 @@
 	import { page } from '$app/state';
 	import { api, ApiException } from '$lib/api';
 	import { bytes } from '$lib/format';
-	import { tweaks, setTweak } from '$lib/stores/tweaks.svelte';
 	import {
 		queue,
 		resolveAllConflicts,
@@ -586,16 +584,6 @@
 					if (e.key === 'Escape') filter = '';
 				}}
 			/>
-			<Segmented
-				value={tweaks.density}
-				onchange={(v) => setTweak('density', v)}
-				size="sm"
-				options={[
-					{ value: 'compact', label: 'Compact' },
-					{ value: 'cosy', label: 'Cosy' },
-					{ value: 'roomy', label: 'Roomy' }
-				]}
-			/>
 			{#snippet refreshIcon()}<RotateCw size={12} strokeWidth={1.7} />{/snippet}
 			<Tooltip text="Refetch listing and rescan bucket usage">
 				<Button size="sm" icon={refreshIcon} onclick={refreshAll} disabled={refreshing}>
@@ -695,7 +683,6 @@
 		{:else}
 			<ObjectTable
 				{items}
-				density={tweaks.density}
 				{selected}
 				{folderSizes}
 				setSelected={(s) => (selected = s)}

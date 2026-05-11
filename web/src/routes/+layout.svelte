@@ -15,7 +15,6 @@
 	import UploadQueue from '$lib/components/upload/UploadQueue.svelte';
 
 	import { theme, setTheme } from '$lib/stores/theme.svelte';
-	import { tweaks } from '$lib/stores/tweaks.svelte';
 	import { primeBuckets, reconcileBackends } from '$lib/stores/buckets.svelte';
 	import { routeFromPage, urlForRoute } from '$lib/route';
 	import {
@@ -189,19 +188,11 @@
 				></button>
 			{/if}
 			<main class="relative flex min-h-0 min-w-0 flex-1 flex-col">
-				<TopBar
-					variant={tweaks.topbarStyle}
-					{crumbs}
-					oncmdk={openPalette}
-					onnavigate={navigateCrumb}
-					onmenu={toggleSidebar}
-				/>
+				<TopBar {crumbs} oncmdk={openPalette} onnavigate={navigateCrumb} onmenu={toggleSidebar} />
 				<div class="relative stw-scroll min-h-0 flex-1 overflow-auto">
 					{@render children()}
 				</div>
-				{#if tweaks.showUploadQueue}
-					<UploadQueue />
-				{/if}
+				<UploadQueue />
 			</main>
 		</div>
 
