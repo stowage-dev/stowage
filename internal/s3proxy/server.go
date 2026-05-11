@@ -677,7 +677,33 @@ func classifyOperation(r *http.Request, route RouteInfo) string {
 			return "CompleteMultipartUpload"
 		case q.Has("delete"):
 			return "DeleteObjects"
+		case route.Key == "" && isPostObjectRequest(r):
+			// Browser-form upload: POST to the bucket root with a
+			// multipart/form-data body carrying a `policy` field.
+			// Distinct from the SigV4 header/presigned paths; auth and
+			// the target key live in the body.
+			return "PostObject"
 		}
 	}
 	return "Unknown"
+}
+
+// isPostObjectRequest reports whether r matches the wire shape of an S3
+// POST Object form upload. Cheap to evaluate — it inspects only the
+// Content-Type header. Callers must already have established the method
+// is POST and the path resolves to a bucket with no key.
+func isPostObjectRequest(r *http.Request) bool {
+	ct := r.Header.Get("Content-Type")
+	if ct == "" {
+		return false
+	}
+	// Content-Type may carry a boundary parameter, e.g.
+	// "multipart/form-data; boundary=----WebKitFormBoundary...".
+	// A case-insensitive prefix match is sufficient — the multipart
+	// parser will reject malformed bodies later.
+	semi := strings.IndexByte(ct, ';')
+	if semi >= 0 {
+		ct = ct[:semi]
+	}
+	return strings.EqualFold(strings.TrimSpace(ct), "multipart/form-data")
 }
