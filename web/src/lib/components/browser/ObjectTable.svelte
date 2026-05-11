@@ -22,6 +22,7 @@
 		onshare: (it: BrowserItem) => void;
 		onpreview: (it: BrowserItem) => void;
 		ondownload?: (it: BrowserItem) => void;
+		onFolderVisible?: (key: string) => void;
 	}
 
 	let {
@@ -33,7 +34,8 @@
 		onopen,
 		onshare,
 		onpreview,
-		ondownload
+		ondownload,
+		onFolderVisible
 	}: Props = $props();
 
 	function folderSizeText(key: string): string {
@@ -42,6 +44,28 @@
 		if (s === 'loading') return '…';
 		if (s === 'error') return '?';
 		return bytes(s);
+	}
+
+	// Fires onFolderVisible when a folder row enters the extended viewport.
+	// A 300px rootMargin pre-loads rows just outside the visible area.
+	function observeFolder(node: HTMLElement, key: string | null) {
+		if (!key || !onFolderVisible) return {};
+		let currentKey: string | null = key;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && currentKey) onFolderVisible!(currentKey);
+			},
+			{ rootMargin: '300px 0px' }
+		);
+		observer.observe(node);
+		return {
+			update(newKey: string | null) {
+				currentKey = newKey;
+			},
+			destroy() {
+				observer.disconnect();
+			}
+		};
 	}
 
 	const cellPadCls = $derived(density === 'compact' ? 'px-2' : 'px-3');
@@ -160,7 +184,7 @@
 >
 	{#snippet row(o)}
 		{@const sel = selected.includes(o.key)}
-		<td class="px-3 align-middle">
+		<td class="px-3 align-middle" use:observeFolder={o.kind === 'folder' ? o.key : null}>
 			<span class="inline-flex items-center align-middle">
 				<input
 					type="checkbox"
