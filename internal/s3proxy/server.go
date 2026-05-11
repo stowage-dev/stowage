@@ -35,7 +35,10 @@ type QuotaEnforcer interface {
 // uploadOps is the set of classified S3 operations that consume bucket
 // quota. CompleteMultipartUpload is intentionally omitted — its part
 // uploads have already been quota-checked individually, and the final
-// assembly carries no Content-Length we can pre-evaluate.
+// assembly carries no Content-Length we can pre-evaluate. PostObject
+// runs through servePostObject which records quota inline, so it isn't
+// included here either; the entry would never fire from the main
+// dispatch path.
 var uploadOps = map[string]struct{}{
 	"PutObject":  {},
 	"UploadPart": {},
@@ -95,6 +98,14 @@ type Config struct {
 	// a real object-store backend without standing up stowage's full
 	// backend registry.
 	AdminCredsOverride func(context.Context, BackendSpec) (aws.Credentials, error)
+
+	// CORS, when non-nil, enables browser-friendly CORS support. The
+	// proxy answers preflight OPTIONS for allowed origins and decorates
+	// non-preflight responses with Access-Control-Allow-Origin /
+	// Expose-Headers. Required for browser-form POST Object uploads
+	// from a different origin than the proxy. Leave nil to preserve
+	// the pre-CORS behavior (OPTIONS falls through to a 4xx).
+	CORS *CORSConfig
 }
 
 // Server implements http.Handler.
@@ -158,6 +169,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Metrics.Inflight.Inc()
 	defer s.cfg.Metrics.Inflight.Dec()
 	s.cfg.Metrics.CacheSize.Set(float64(s.cfg.Source.Size()))
+
+	// CORS preflight: answer and short-circuit before any auth or
+	// dispatch logic runs. handlePreflight returns false for
+	// non-preflight OPTIONS or disallowed origins; those flow through
+	// to the regular path (and will 4xx, same as before CORS support).
+	if handlePreflight(s.cfg.CORS, w, r) {
+		s.cfg.Metrics.Requests.WithLabelValues(r.Method, "CORSPreflight", strconv.Itoa(http.StatusNoContent), "ok", "cors").Inc()
+		return
+	}
+	// Echo Origin on every actual response so cross-origin clients can
+	// read it. Safe to call unconditionally — no-op when CORS is off or
+	// the origin isn't allowed.
+	decorateCORS(s.cfg.CORS, w, r)
 
 	out := s.serve(w, r, reqID)
 	elapsed := time.Since(start).Seconds()
@@ -271,6 +295,17 @@ func (s *Server) recordAudit(r *http.Request, reqID string, out servedRequest) {
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request, reqID string) servedRequest {
 	out := servedRequest{operation: "Unknown", authMode: "signed"}
+
+	// PostObject: browser-form upload. Auth lives in the body (signed
+	// policy doc), not in any header or query param, so the request looks
+	// "unauthenticated" to both the SigV4 path and the anonymous fast-path.
+	// Branch off here so neither misroutes it.
+	if r.Method == http.MethodPost && isPostObjectRequest(r) {
+		route := ClassifyRoute(r, s.cfg.HostSuffixes)
+		if route.Bucket != "" && route.Key == "" {
+			return s.servePostObject(w, r, route, reqID)
+		}
+	}
 
 	// Anonymous fast-path: only consulted when (a) the request carries no
 	// SigV4 credentials at all, and (b) the cluster opt-in is on. Malformed
@@ -677,7 +712,33 @@ func classifyOperation(r *http.Request, route RouteInfo) string {
 			return "CompleteMultipartUpload"
 		case q.Has("delete"):
 			return "DeleteObjects"
+		case route.Key == "" && isPostObjectRequest(r):
+			// Browser-form upload: POST to the bucket root with a
+			// multipart/form-data body carrying a `policy` field.
+			// Distinct from the SigV4 header/presigned paths; auth and
+			// the target key live in the body.
+			return "PostObject"
 		}
 	}
 	return "Unknown"
+}
+
+// isPostObjectRequest reports whether r matches the wire shape of an S3
+// POST Object form upload. Cheap to evaluate — it inspects only the
+// Content-Type header. Callers must already have established the method
+// is POST and the path resolves to a bucket with no key.
+func isPostObjectRequest(r *http.Request) bool {
+	ct := r.Header.Get("Content-Type")
+	if ct == "" {
+		return false
+	}
+	// Content-Type may carry a boundary parameter, e.g.
+	// "multipart/form-data; boundary=----WebKitFormBoundary...".
+	// A case-insensitive prefix match is sufficient — the multipart
+	// parser will reject malformed bodies later.
+	semi := strings.IndexByte(ct, ';')
+	if semi >= 0 {
+		ct = ct[:semi]
+	}
+	return strings.EqualFold(strings.TrimSpace(ct), "multipart/form-data")
 }
