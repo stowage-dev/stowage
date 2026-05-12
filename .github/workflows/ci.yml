@@ -40,7 +40,17 @@ jobs:
         run: go test -race ./...
 
       - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+        # `go run honnef.co/go/tools/cmd/staticcheck@latest` downgrades the
+        # toolchain to whatever staticcheck's go.mod minimum requires
+        # (currently go1.25). When the resulting binary then tries to
+        # analyze this repo (go 1.26), it errors out with
+        # "package requires newer Go version go1.26". Forcing
+        # GOTOOLCHAIN=go1.26.0 on the install build pins staticcheck to
+        # the same toolchain the project uses, so its stdlib view matches.
+        # Bump this pin in lockstep with the project's `go` directive.
+        run: |
+          GOTOOLCHAIN=go1.26.0 go install honnef.co/go/tools/cmd/staticcheck@latest
+          "$(go env GOPATH)/bin/staticcheck" ./...
 
   chart:
     name: Helm chart (lint + template)

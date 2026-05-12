@@ -56,7 +56,12 @@ vet:
 	go vet ./...
 
 lint: vet
-	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+	@# `go run @latest` downgrades the toolchain to staticcheck's go.mod
+	@# minimum (go1.25), and the resulting binary then can't analyze our
+	@# go1.26 source. Pinning GOTOOLCHAIN matches CI's behaviour — bump
+	@# in lockstep with the `go` directive in go.mod.
+	GOTOOLCHAIN=go1.26.0 go install honnef.co/go/tools/cmd/staticcheck@latest
+	"$$(go env GOPATH)/bin/staticcheck" ./...
 
 tidy:
 	go mod tidy
