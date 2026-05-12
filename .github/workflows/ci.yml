@@ -77,11 +77,12 @@ jobs:
           [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
 
       # helm/kind-action spins up a kind cluster, writes kubeconfig, and
-      # exposes the cluster name for follow-up steps. The version pins
-      # match scripts/e2e-bootstrap.sh so local and CI runs are identical.
+      # exposes the cluster name for follow-up steps. Kind v0.26 is the
+      # first release with kubernetes v1.32 node images; pin both so local
+      # `make e2e` and CI run against the same matrix.
       - uses: helm/kind-action@v1
         with:
-          version: v0.24.0
+          version: v0.26.0
           node_image: kindest/node:v1.32.0
           cluster_name: stowage-e2e
           wait: 120s
@@ -93,6 +94,7 @@ jobs:
       - name: Bootstrap CRDs + host.docker.internal
         id: bootstrap
         run: |
+          set -euo pipefail
           # Reuse the same bootstrap script the Makefile uses — it skips
           # cluster creation when one already exists (kind-action created
           # ours) and emits env exports we forward into GITHUB_ENV.
