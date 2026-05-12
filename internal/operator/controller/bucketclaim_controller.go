@@ -27,19 +27,28 @@ import (
 	"github.com/stowage-dev/stowage/internal/operator/backend"
 	"github.com/stowage-dev/stowage/internal/operator/credentials"
 	"github.com/stowage-dev/stowage/internal/operator/vcstore"
+	"github.com/stowage-dev/stowage/internal/proxyurl"
 )
 
 // BucketClaimReconciler provisions the real bucket and the two Secrets that
 // make a BucketClaim usable.
 type BucketClaimReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Resolver   *credentials.Resolver
-	Writer     *vcstore.Writer
-	Recorder   record.EventRecorder
-	ProxyURL   string
-	OpsNS      string
-	MaxWorkers int
+	Scheme   *runtime.Scheme
+	Resolver *credentials.Resolver
+	Writer   *vcstore.Writer
+	Recorder record.EventRecorder
+	// ProxyURL is the in-cluster URL of the proxy. Used as the fallback
+	// for the consumer Secret's AWS_ENDPOINT_URL when PublicHostname is
+	// empty. Mirrored into BucketClaim.Status.ProxyEndpoint so kubectl
+	// users see where the credential points.
+	ProxyURL string
+	// PublicHostname, when set, overrides ProxyURL in the consumer
+	// Secret's AWS_ENDPOINT_URL. Resolved via proxyurl.Resolve so the
+	// dashboard and the operator agree on the value.
+	PublicHostname string
+	OpsNS          string
+	MaxWorkers     int
 }
 
 // +kubebuilder:rbac:groups=broker.stowage.io,resources=bucketclaims,verbs=get;list;watch;create;update;patch;delete
@@ -134,12 +143,13 @@ func (r *BucketClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Info("sweep expired failed", "err", err)
 	}
 
+	endpoint := proxyurl.Resolve(r.PublicHostname, r.ProxyURL, "", false)
 	secretName := r.consumerSecretName(&claim)
 	if err := r.Writer.WriteConsumer(ctx, &claim, secretName, vcstore.ConsumerValues{
 		AccessKeyID:     vc.AccessKeyID,
 		SecretAccessKey: vc.SecretAccessKey,
 		Region:          bck.Spec.Region,
-		EndpointURL:     r.ProxyURL,
+		EndpointURL:     endpoint,
 		BucketName:      bucketName,
 		AddressingStyle: string(bck.Spec.AddressingStyle),
 	}); err != nil {
@@ -159,7 +169,7 @@ func (r *BucketClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	claim.Status.Phase = brokerv1a1.PhaseBound
 	claim.Status.BucketName = bucketName
-	claim.Status.ProxyEndpoint = r.ProxyURL
+	claim.Status.ProxyEndpoint = endpoint
 	claim.Status.BoundSecretName = secretName
 	claim.Status.AccessKeyID = vc.AccessKeyID
 	if rotatedAt != nil {

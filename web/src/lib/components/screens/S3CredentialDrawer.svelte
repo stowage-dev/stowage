@@ -27,9 +27,9 @@
 	let expiresCustom = $state('');
 	let busy = $state(false);
 	let created = $state<S3Credential | null>(null);
-	let copiedField = $state<'key' | 'secret' | null>(null);
+	let copiedField = $state<string | null>(null);
 
-	function copy(text: string, which: 'key' | 'secret'): void {
+	function copy(text: string, which: string): void {
 		navigator.clipboard?.writeText(text);
 		copiedField = which;
 		setTimeout(() => {
@@ -139,6 +139,68 @@
 					{created.backend_id} · {created.buckets.join(', ')}
 				</div>
 			</FormField>
+
+			{#if created.bucket_urls && Object.keys(created.bucket_urls).length === 1}
+				{@const bucket = Object.keys(created.bucket_urls)[0]}
+				{@const url = created.bucket_urls[bucket]}
+				<FormField label="Bucket URL">
+					<div class="flex items-center gap-2">
+						<input class="stw-input" readonly value={url} />
+						<button
+							type="button"
+							class="stw-icon-btn"
+							aria-label="Copy bucket URL"
+							onclick={() => copy(url, `bucket:${bucket}`)}
+						>
+							{#if copiedField === `bucket:${bucket}`}
+								<Check size={14} strokeWidth={1.7} />
+							{:else}
+								<Copy size={14} strokeWidth={1.7} />
+							{/if}
+						</button>
+					</div>
+				</FormField>
+			{:else if created.bucket_urls && Object.keys(created.bucket_urls).length > 1}
+				<FormField label="Bucket URLs">
+					<div class="flex flex-col gap-1.5">
+						{#each Object.entries(created.bucket_urls) as [bucket, url] (bucket)}
+							<div class="flex items-center gap-2">
+								<input class="stw-input" readonly value={url} aria-label={`URL for ${bucket}`} />
+								<button
+									type="button"
+									class="stw-icon-btn"
+									aria-label={`Copy URL for ${bucket}`}
+									onclick={() => copy(url, `bucket:${bucket}`)}
+								>
+									{#if copiedField === `bucket:${bucket}`}
+										<Check size={14} strokeWidth={1.7} />
+									{:else}
+										<Copy size={14} strokeWidth={1.7} />
+									{/if}
+								</button>
+							</div>
+						{/each}
+					</div>
+				</FormField>
+			{:else if created.endpoint_url}
+				<FormField label="Endpoint">
+					<div class="flex items-center gap-2">
+						<input class="stw-input" readonly value={created.endpoint_url} />
+						<button
+							type="button"
+							class="stw-icon-btn"
+							aria-label="Copy endpoint URL"
+							onclick={() => copy(created!.endpoint_url ?? '', 'endpoint')}
+						>
+							{#if copiedField === 'endpoint'}
+								<Check size={14} strokeWidth={1.7} />
+							{:else}
+								<Copy size={14} strokeWidth={1.7} />
+							{/if}
+						</button>
+					</div>
+				</FormField>
+			{/if}
 
 			<ActionBar>
 				<Button variant="primary" onclick={onclose}>Done</Button>

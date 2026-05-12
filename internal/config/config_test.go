@@ -52,3 +52,33 @@ func TestS3ProxyValidation_Valid(t *testing.T) {
 		t.Fatalf("expected valid config, got %v", err)
 	}
 }
+
+func TestS3ProxyValidation_PublicHostnameRejectsScheme(t *testing.T) {
+	c := Defaults()
+	c.S3Proxy.PublicHostname = "https://s3.example.com"
+	err := c.validate()
+	if err == nil || !strings.Contains(err.Error(), "public_hostname") {
+		t.Fatalf("want public_hostname error, got %v", err)
+	}
+}
+
+func TestS3ProxyValidation_PublicHostnameRejectsPath(t *testing.T) {
+	c := Defaults()
+	c.S3Proxy.PublicHostname = "s3.example.com/uploads"
+	err := c.validate()
+	if err == nil || !strings.Contains(err.Error(), "public_hostname") {
+		t.Fatalf("want public_hostname error, got %v", err)
+	}
+}
+
+func TestS3ProxyValidation_PublicHostnameBareHostOK(t *testing.T) {
+	c := Defaults()
+	c.S3Proxy.PublicHostname = "s3.example.com"
+	if err := c.validate(); err != nil {
+		t.Fatalf("bare host should be valid, got %v", err)
+	}
+	c.S3Proxy.PublicHostname = "s3.example.com:8443"
+	if err := c.validate(); err != nil {
+		t.Fatalf("host:port should be valid, got %v", err)
+	}
+}

@@ -36,6 +36,34 @@ ingress:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   tls: true
 
+# Public-facing settings for the embedded S3 proxy. publicHostname is the
+# externally-resolvable hostname clients use to reach the proxy; it lands
+# in stowage's s3_proxy.public_hostname config field and drives both the
+# AWS_ENDPOINT_URL the operator stamps into consumer Secrets and the
+# bucket URLs the dashboard shows. Empty means "no public hostname" —
+# stowage falls back to the in-cluster Service URL.
+#
+# The ingress sub-block, when enabled, renders a separate Ingress that
+# targets the proxy port (s3) on the stowage Service. Virtual-hosted-style
+# clients need a wildcard host on the ingress (configure via .hosts), so
+# the default rules cover both the bare hostname and *.<publicHostname>.
+s3Proxy:
+  publicHostname: ""
+  ingress:
+    enabled: false
+    className: ""
+    # Annotations applied to the proxy ingress. Defaults are empty so
+    # operators can opt into cert-manager / wildcard certs themselves.
+    annotations: {}
+    # When tls is true the chart adds a TLS section pointing at the
+    # secret named in tlsSecretName (defaults to stowage-s3-ingress-tls).
+    tls: true
+    tlsSecretName: ""
+    # Extra hosts to route alongside publicHostname. Useful for virtual-
+    # hosted clients ("*.s3.example.com") or for adding a path-style
+    # alias. publicHostname is always included; this list is appended.
+    extraHosts: []
+
 # Verbatim YAML merged on top of the chart's generated stowage config.yaml.
 # Use this for OIDC, audit sampling, rate-limit overrides, host suffixes,
 # and any other knob the chart doesn't expose directly.

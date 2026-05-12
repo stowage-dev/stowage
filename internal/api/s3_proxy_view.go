@@ -9,6 +9,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/stowage-dev/stowage/internal/backend"
+	"github.com/stowage-dev/stowage/internal/proxyurl"
 	"github.com/stowage-dev/stowage/internal/s3proxy"
 	"github.com/stowage-dev/stowage/internal/store/sqlite"
 )
@@ -29,6 +31,12 @@ type S3ProxyViewDeps struct {
 	Store          *sqlite.Store
 	OperatorSource OperatorSourceSnapshotter
 	Logger         *slog.Logger
+	// PublicHostname / ProxyURL / Registry feed the URL hints rendered
+	// onto each merged-view credential row. See S3CredentialDeps for the
+	// same fields and the resolution rules they share.
+	PublicHostname string
+	ProxyURL       string
+	Registry       *backend.Registry
 }
 
 // s3CredViewDTO mirrors s3CredDTO but adds a Source tag and the operator-only
@@ -37,20 +45,22 @@ type S3ProxyViewDeps struct {
 // either shown once on creation (sqlite) or only ever leaves the cluster as
 // the tenant's wired-up Secret (kubernetes).
 type s3CredViewDTO struct {
-	AccessKey      string   `json:"access_key"`
-	BackendID      string   `json:"backend_id"`
-	Buckets        []string `json:"buckets"`
-	UserID         string   `json:"user_id,omitempty"`
-	Description    string   `json:"description,omitempty"`
-	Enabled        bool     `json:"enabled"`
-	ExpiresAt      string   `json:"expires_at,omitempty"`
-	CreatedAt      string   `json:"created_at,omitempty"`
-	CreatedBy      string   `json:"created_by,omitempty"`
-	UpdatedAt      string   `json:"updated_at,omitempty"`
-	UpdatedBy      string   `json:"updated_by,omitempty"`
-	Source         string   `json:"source"` // "sqlite" | "kubernetes"
-	ClaimNamespace string   `json:"claim_namespace,omitempty"`
-	ClaimName      string   `json:"claim_name,omitempty"`
+	AccessKey      string            `json:"access_key"`
+	BackendID      string            `json:"backend_id"`
+	Buckets        []string          `json:"buckets"`
+	UserID         string            `json:"user_id,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	Enabled        bool              `json:"enabled"`
+	ExpiresAt      string            `json:"expires_at,omitempty"`
+	CreatedAt      string            `json:"created_at,omitempty"`
+	CreatedBy      string            `json:"created_by,omitempty"`
+	UpdatedAt      string            `json:"updated_at,omitempty"`
+	UpdatedBy      string            `json:"updated_by,omitempty"`
+	Source         string            `json:"source"` // "sqlite" | "kubernetes"
+	ClaimNamespace string            `json:"claim_namespace,omitempty"`
+	ClaimName      string            `json:"claim_name,omitempty"`
+	EndpointURL    string            `json:"endpoint_url,omitempty"`
+	BucketURLs     map[string]string `json:"bucket_urls,omitempty"`
 }
 
 type s3AnonViewDTO struct {
@@ -78,12 +88,12 @@ func (d *S3ProxyViewDeps) handleListCredentials(w http.ResponseWriter, r *http.R
 			return
 		}
 		for _, c := range rows {
-			out = append(out, sqliteCredToView(c))
+			out = append(out, d.sqliteCredToView(c))
 		}
 	}
 	if d.OperatorSource != nil {
 		for _, vc := range d.OperatorSource.SnapshotCredentials() {
-			out = append(out, kubeCredToView(vc))
+			out = append(out, d.kubeCredToView(vc))
 		}
 	}
 
@@ -125,7 +135,7 @@ func (d *S3ProxyViewDeps) handleListAnonymous(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]any{"bindings": out})
 }
 
-func sqliteCredToView(c *sqlite.S3Credential) s3CredViewDTO {
+func (d *S3ProxyViewDeps) sqliteCredToView(c *sqlite.S3Credential) s3CredViewDTO {
 	out := s3CredViewDTO{
 		AccessKey:   c.AccessKey,
 		BackendID:   c.BackendID,
@@ -150,10 +160,11 @@ func sqliteCredToView(c *sqlite.S3Credential) s3CredViewDTO {
 	if buckets, err := c.UnmarshalBuckets(); err == nil {
 		out.Buckets = buckets
 	}
+	out.EndpointURL, out.BucketURLs = d.urls(c.BackendID, out.Buckets)
 	return out
 }
 
-func kubeCredToView(vc *s3proxy.VirtualCredential) s3CredViewDTO {
+func (d *S3ProxyViewDeps) kubeCredToView(vc *s3proxy.VirtualCredential) s3CredViewDTO {
 	buckets := make([]string, 0, len(vc.BucketScopes))
 	for _, s := range vc.BucketScopes {
 		buckets = append(buckets, s.BucketName)
@@ -171,7 +182,31 @@ func kubeCredToView(vc *s3proxy.VirtualCredential) s3CredViewDTO {
 	if vc.ExpiresAt != nil {
 		out.ExpiresAt = vc.ExpiresAt.UTC().Format(time.RFC3339)
 	}
+	out.EndpointURL, out.BucketURLs = d.urls(vc.BackendName, buckets)
 	return out
+}
+
+// urls mirrors S3CredentialDeps.urls so the merged-view rows carry the
+// same endpoint hints. Returns ("", nil) when no public URL is configured.
+func (d *S3ProxyViewDeps) urls(backendID string, buckets []string) (string, map[string]string) {
+	base := proxyurl.Resolve(d.PublicHostname, d.ProxyURL, "", false)
+	if base == "" {
+		return "", nil
+	}
+	if d.Registry == nil || len(buckets) == 0 {
+		return base, nil
+	}
+	target, ok, err := d.Registry.ProxyTarget(backendID)
+	if err != nil || !ok {
+		return base, nil
+	}
+	out := make(map[string]string, len(buckets))
+	for _, b := range buckets {
+		if u := proxyurl.Resolve(d.PublicHostname, d.ProxyURL, b, target.PathStyle); u != "" {
+			out[b] = u
+		}
+	}
+	return base, out
 }
 
 func sqliteAnonToView(b *sqlite.S3AnonymousBinding) s3AnonViewDTO {

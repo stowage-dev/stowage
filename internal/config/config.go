@@ -114,8 +114,17 @@ type S3ProxyConfig struct {
 	AnonymousEnabled bool `yaml:"anonymous_enabled"`
 	// AnonymousRPS is the per-source-IP RPS default for anonymous requests
 	// when the binding does not specify a per-binding override.
-	AnonymousRPS float64           `yaml:"anonymous_rps"`
-	Kubernetes   S3ProxyKubernetes `yaml:"kubernetes"`
+	AnonymousRPS float64 `yaml:"anonymous_rps"`
+	// PublicHostname, when set, overrides the inbound r.Host when the proxy
+	// builds the 201 Location returned by a successful browser-form POST
+	// Object upload. Useful when the proxy sits behind an ingress that
+	// rewrites Host, or when the externally-advertised hostname differs
+	// from the address the proxy was reached on. Path-style requests
+	// substitute the host outright; virtual-hosted requests prepend the
+	// bucket subdomain to the configured value. Scheme is still derived
+	// from the request (TLS / X-Forwarded-Proto).
+	PublicHostname string            `yaml:"public_hostname"`
+	Kubernetes     S3ProxyKubernetes `yaml:"kubernetes"`
 }
 
 // S3ProxyKubernetes opts the proxy into reading virtual credentials and
@@ -396,6 +405,14 @@ func (c Config) validate() error {
 		}
 		if c.S3Proxy.Listen == c.Server.Listen {
 			return fmt.Errorf("s3_proxy.listen must differ from server.listen (both set to %q)", c.S3Proxy.Listen)
+		}
+	}
+	if h := strings.TrimSpace(c.S3Proxy.PublicHostname); h != "" {
+		if strings.ContainsAny(h, "/?#") {
+			return fmt.Errorf("s3_proxy.public_hostname must be a bare host (no scheme or path), got %q", h)
+		}
+		if strings.Contains(h, "://") {
+			return fmt.Errorf("s3_proxy.public_hostname must not include a scheme, got %q", h)
 		}
 	}
 	if c.Operator.Enabled {
