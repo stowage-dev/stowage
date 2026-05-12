@@ -70,17 +70,25 @@ kind get kubeconfig --name "${CLUSTER}" > "${KUBECONFIG_PATH}.tmp"
 mv "${KUBECONFIG_PATH}.tmp" "${KUBECONFIG_PATH}"
 export KUBECONFIG="${KUBECONFIG_PATH}"
 
-# Discover the kind network gateway IP. The in-process webhook server
-# binds on 0.0.0.0; the apiserver inside the kind container dials the
-# gateway to reach the host. Linux docker doesn't ship a working
-# host.docker.internal, so we patch /etc/hosts inside each node to point
-# host.docker.internal at the gateway IP.
-GATEWAY="$(docker network inspect kind --format '{{ (index .IPAM.Config 0).Gateway }}')"
+# Discover the gateway IP the kind apiserver should dial to reach the
+# host. The in-process webhook server binds on 0.0.0.0; we patch
+# host.docker.internal -> $GATEWAY into each kind node so the apiserver's
+# webhook config (using `url:` not `service:`) resolves there.
+#
+# We deliberately do NOT inspect the "kind" docker network directly —
+# helm/kind-action and other wrappers occasionally rename it, and IPAM
+# config layouts vary across docker engine versions. Reading the gateway
+# off the control-plane container's own networking is the canonical
+# pattern from the kind docs.
+CONTROL_PLANE="${CLUSTER}-control-plane"
+GATEWAY="$(docker inspect "${CONTROL_PLANE}" --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' 2>/dev/null || true)"
 if [[ -z "${GATEWAY}" ]]; then
-  echo "e2e-bootstrap: could not discover kind network gateway" >&2
+  echo "e2e-bootstrap: could not discover gateway from container ${CONTROL_PLANE}" >&2
+  echo "e2e-bootstrap: docker inspect output follows for triage:" >&2
+  docker inspect "${CONTROL_PLANE}" >&2 || true
   exit 1
 fi
-echo "e2e-bootstrap: kind network gateway is ${GATEWAY}" >&2
+echo "e2e-bootstrap: kind gateway (from ${CONTROL_PLANE}) is ${GATEWAY}" >&2
 
 for node in $(kind get nodes --name "${CLUSTER}"); do
   # Avoid duplicate /etc/hosts entries on re-runs.
