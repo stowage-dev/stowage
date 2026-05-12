@@ -197,7 +197,9 @@ func splitYAML(s string) []string {
 	return out
 }
 
-// truncate caps s at n runes so test log output stays readable.
+// truncate caps s at n bytes so test log output stays readable. The
+// chart's rendered YAML is pure ASCII, so a byte-precise cap is fine
+// here — for an arbitrary-input helper we'd need rune-aware slicing.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s

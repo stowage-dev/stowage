@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +27,12 @@ import (
 	"github.com/stowage-dev/stowage/internal/operator/credentials"
 	"github.com/stowage-dev/stowage/internal/operator/vcstore"
 )
+
+// cacheSyncTimeout caps how long startAndAttach/RunPersistent will wait
+// for the manager cache to finish its initial sync. Without a bound, a
+// missing RBAC permission or unreachable apiserver pins the test at the
+// `go test -timeout` deadline (15 minutes), which makes triage painful.
+const cacheSyncTimeout = 60 * time.Second
 
 // errCacheSync is returned by RunPersistent when the manager's cache
 // fails its initial sync; the caller is expected to surface it as a
@@ -66,10 +73,15 @@ type ManagerHandle struct {
 	Client   client.Client
 	Recorder *record.FakeRecorder
 
-	t        *testing.T
-	cancel   context.CancelFunc
-	exitErr  chan error
-	stopped  bool
+	// t may be nil for persistent handles produced by RunPersistent; Stop
+	// guards every t use behind a nil-check so the persistent case can
+	// still tear the manager down (e.g. from a TestMain cleanup).
+	t       *testing.T
+	cancel  context.CancelFunc
+	exitErr chan error
+	// stopOnce serialises calls to Stop. With -race the previous
+	// stopped-bool guard tripped on concurrent Stop/cleanup calls.
+	stopOnce sync.Once
 }
 
 // StartOperatorManager wires both reconcilers into a manager backed by the
@@ -179,8 +191,8 @@ func Run(t *testing.T, mgr ctrl.Manager) *ManagerHandle {
 // reinstalling ValidatingWebhookConfigurations between tests would race
 // the apiserver's CA-bundle cache.
 //
-// The persistent manager's cache is synced before this returns, matching
-// Run's contract.
+// The persistent manager's cache is synced before this returns (with a
+// cacheSyncTimeout bound), matching Run's contract.
 func RunPersistent(mgr ctrl.Manager) (*ManagerHandle, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	exit := make(chan error, 1)
@@ -192,7 +204,7 @@ func RunPersistent(mgr ctrl.Manager) (*ManagerHandle, error) {
 		cancel:  cancel,
 		exitErr: exit,
 	}
-	syncCtx, syncCancel := context.WithTimeout(ctx, 60*time.Second)
+	syncCtx, syncCancel := context.WithTimeout(ctx, cacheSyncTimeout)
 	defer syncCancel()
 	if !mgr.GetCache().WaitForCacheSync(syncCtx) {
 		cancel()
@@ -218,29 +230,40 @@ func startAndAttach(t *testing.T, mgr ctrl.Manager, recorder *record.FakeRecorde
 	t.Cleanup(h.Stop)
 
 	// Block until the cache is synced — otherwise the first Get/List in a
-	// test races the informer warmup and reads stale data.
-	if !mgr.GetCache().WaitForCacheSync(ctx) {
-		t.Fatalf("manager cache failed initial sync")
+	// test races the informer warmup and reads stale data. Bound the wait
+	// so a missing RBAC perm / unreachable apiserver fails fast instead of
+	// pinning at `go test -timeout`.
+	syncCtx, syncCancel := context.WithTimeout(ctx, cacheSyncTimeout)
+	defer syncCancel()
+	if !mgr.GetCache().WaitForCacheSync(syncCtx) {
+		cancel()
+		t.Fatalf("manager cache failed initial sync within %s", cacheSyncTimeout)
 	}
 	return h
 }
 
 // Stop cancels the manager context and waits up to 15s for the manager
-// goroutine to exit. Idempotent.
+// goroutine to exit. Safe to call concurrently and from any number of
+// callers; only the first invocation does real work.
 func (h *ManagerHandle) Stop() {
-	if h == nil || h.stopped {
+	if h == nil {
 		return
 	}
-	h.stopped = true
-	h.cancel()
-	select {
-	case err := <-h.exitErr:
-		if err != nil && !strings.Contains(err.Error(), "context canceled") {
-			h.t.Logf("manager exited: %v", err)
+	h.stopOnce.Do(func() {
+		h.cancel()
+		select {
+		case err := <-h.exitErr:
+			if err != nil && !strings.Contains(err.Error(), "context canceled") {
+				if h.t != nil {
+					h.t.Logf("manager exited: %v", err)
+				}
+			}
+		case <-time.After(15 * time.Second):
+			if h.t != nil {
+				h.t.Logf("manager did not exit within 15s after cancel")
+			}
 		}
-	case <-time.After(15 * time.Second):
-		h.t.Logf("manager did not exit within 15s after cancel")
-	}
+	})
 }
 
 // runnable adapts a Start(ctx) function into a manager.Runnable.

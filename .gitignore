@@ -37,3 +37,6 @@ Thumbs.db
 
 # Local audit/scratch dir
 /.audit/
+
+# kind cluster kubeconfig written by scripts/e2e-bootstrap.sh
+/.e2e/

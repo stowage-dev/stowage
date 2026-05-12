@@ -44,12 +44,21 @@ else
   kind create cluster --name "${CLUSTER}" --image "${KIND_IMAGE}" --wait 120s
 fi
 
-# Point kubectl at the cluster for the remainder of this script and emit
-# the same kubeconfig path for callers (Makefile sets KUBECONFIG before
-# running `go test`).
-KUBECONFIG_PATH="${KUBECONFIG:-${HOME}/.kube/config}"
+# Write the cluster's kubeconfig to a repo-local file so the script
+# never clobbers a developer's $HOME/.kube/config. STOWAGE_E2E_KUBECONFIG
+# overrides the default; CI runners typically point it at RUNNER_TEMP so
+# successive jobs don't share state.
+#
+# We deliberately do NOT honour an externally-set KUBECONFIG here: the
+# whole point of the script is to produce a fresh, isolated kubeconfig
+# for the e2e suite. The exports we emit at the end of the script point
+# callers (Makefile / CI) at this path.
+KUBECONFIG_DIR="${REPO_ROOT}/.e2e"
+KUBECONFIG_PATH="${STOWAGE_E2E_KUBECONFIG:-${KUBECONFIG_DIR}/kubeconfig}"
+mkdir -p "$(dirname "${KUBECONFIG_PATH}")"
 kind get kubeconfig --name "${CLUSTER}" > "${KUBECONFIG_PATH}.tmp"
 mv "${KUBECONFIG_PATH}.tmp" "${KUBECONFIG_PATH}"
+export KUBECONFIG="${KUBECONFIG_PATH}"
 
 # Discover the kind network gateway IP. The in-process webhook server
 # binds on 0.0.0.0; the apiserver inside the kind container dials the
@@ -87,7 +96,8 @@ e2e-bootstrap: ready. Export the following before \`go test -tags e2e\`:
   STOWAGE_E2E_WEBHOOK_EXTERNAL_HOST=${GATEWAY}
   STOWAGE_E2E_OPS_NS=${OPS_NS}
 
-The Makefile \`e2e\` target sets these automatically.
+The Makefile \`e2e\` target sets these automatically. Your default
+~/.kube/config is not touched; teardown wipes ${KUBECONFIG_DIR}.
 EOF
 
 # Emit shell-eval'able exports for the Makefile to consume.

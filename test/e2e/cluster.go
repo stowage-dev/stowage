@@ -120,10 +120,12 @@ func loadRESTConfig() (*rest.Config, error) {
 	return nil, err
 }
 
-// EnsureCRDs verifies the broker.stowage.io CRDs are present on the cluster
-// and, if not, applies them from deploy/chart/crds/. The bootstrap script
-// normally does this, but running it from TestMain too lets a dev iterate
-// on a long-lived kind cluster without re-running bootstrap after edits.
+// EnsureCRDs verifies the broker.stowage.io CRDs are present on the
+// cluster and returns an actionable error if any are missing. CRDs are
+// applied by scripts/e2e-bootstrap.sh; this function deliberately does
+// not self-heal because hot-applying CRDs from inside TestMain races
+// the apiserver's discovery cache and confuses the tests that follow.
+// LocateCRDs is exposed for callers that need the directory path.
 func (c *Cluster) EnsureCRDs(ctx context.Context) error {
 	for _, name := range []string{"s3backends.broker.stowage.io", "bucketclaims.broker.stowage.io"} {
 		var crd apiextv1.CustomResourceDefinition
