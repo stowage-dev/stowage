@@ -2,15 +2,17 @@ BINARY          := stowage
 CMD             := ./cmd/stowage
 BIN_DIR         := bin
 
-.PHONY: help build run test envtest envtest-assets vet lint tidy clean docker frontend setup-hooks
+.PHONY: help build run test e2e e2e-bootstrap e2e-teardown chart-test vet lint tidy clean docker frontend setup-hooks
 
 help:
 	@echo "Targets:"
 	@echo "  build           build the stowage binary into $(BIN_DIR)/"
 	@echo "  run             build and run 'stowage serve'"
 	@echo "  test            go test ./..."
-	@echo "  envtest         go test -tags envtest ./... (operator + s3proxy)"
-	@echo "  envtest-assets  download kube-apiserver/etcd via setup-envtest"
+	@echo "  e2e             bring up a kind cluster and run the e2e suite"
+	@echo "  e2e-bootstrap   create the kind cluster + install CRDs (idempotent)"
+	@echo "  e2e-teardown    delete the kind cluster"
+	@echo "  chart-test      run offline Helm chart tests (lint + template)"
 	@echo "  vet             go vet ./..."
 	@echo "  lint            vet + staticcheck"
 	@echo "  tidy            go mod tidy"
@@ -29,20 +31,26 @@ run: build
 test:
 	go test ./...
 
-# envtest spins up a real kube-apiserver+etcd via sigs.k8s.io/controller-runtime/tools/setup-envtest
-# and exercises the operator controllers, admission webhooks, vcstore Reader/Writer, and the
-# s3proxy KubernetesSource against the real informer.
-ENVTEST_K8S_VERSION ?= 1.32.0
+# Offline Helm chart tests (lint + template snapshots). Needs `helm` on PATH;
+# does not need a cluster.
+chart-test:
+	go test ./test/chart/...
 
-envtest-assets:
-	@command -v setup-envtest >/dev/null 2>&1 || \
-		go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-	setup-envtest use $(ENVTEST_K8S_VERSION) -p path
+# e2e runs the Kubernetes integration suite against a kind cluster. The
+# bootstrap script creates the cluster (if absent), installs the broker
+# CRDs from deploy/chart/crds, patches kind nodes so host.docker.internal
+# resolves to the docker bridge gateway, and emits the env exports that
+# the Go test process needs. We `eval` those exports for this invocation
+# only — re-running `make e2e` is idempotent.
+e2e-bootstrap:
+	./scripts/e2e-bootstrap.sh >/dev/null
 
-envtest: envtest-assets
-	KUBEBUILDER_ASSETS="$$(setup-envtest use $(ENVTEST_K8S_VERSION) -p path)" \
-		go test -tags envtest -timeout 10m \
-		./internal/operator/... ./internal/s3proxy/...
+e2e-teardown:
+	./scripts/e2e-teardown.sh
+
+e2e:
+	eval "$$(./scripts/e2e-bootstrap.sh)" && \
+		go test -tags e2e -timeout 15m -count=1 ./test/e2e/...
 
 vet:
 	go vet ./...
