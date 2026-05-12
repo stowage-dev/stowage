@@ -2,11 +2,12 @@ name: Publish Helm chart
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'deploy/chart/**'
-      - '.github/workflows/helm-publish.yml'
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish (e.g. v0.1.0)'
+        required: true
 
 permissions:
   contents: write
@@ -25,8 +26,22 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ref='${{ inputs.tag }}'
+          else
+            ref="${GITHUB_REF_NAME}"
+          fi
+          # Chart and app versions must be SemVer 2 without a leading 'v'.
+          version="${ref#v}"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v5
         with:
+          ref: ${{ steps.tag.outputs.ref }}
           fetch-depth: 0
 
       - name: Configure Git
@@ -48,10 +63,15 @@ jobs:
           fi
 
       - name: Package chart
+        env:
+          CHART_VERSION: ${{ steps.tag.outputs.version }}
         run: |
           mkdir -p .cr-release-packages
           helm dependency update deploy/chart
-          helm package deploy/chart --destination .cr-release-packages
+          helm package deploy/chart \
+            --destination .cr-release-packages \
+            --version "${CHART_VERSION}" \
+            --app-version "${CHART_VERSION}"
 
       - name: Update chart repository index
         run: |

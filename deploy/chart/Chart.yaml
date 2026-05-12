@@ -2,8 +2,9 @@ apiVersion: v2
 name: stowage
 description: Stowage — OIDC dashboard, embedded S3 SigV4 proxy, and Kubernetes operator deployed and wired together.
 type: application
-version: 0.2.0
-appVersion: "0.1.0"
+# Overridden at package time by .github/workflows/helm-publish.yml from the release tag.
+version: 0.0.0
+appVersion: "0.0.0"
 keywords:
   - s3
   - object-storage
