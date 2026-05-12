@@ -1,0 +1,75 @@
+name: Publish Helm chart
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/chart/**'
+      - '.github/workflows/helm-publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: helm-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Package and publish chart to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Fetch existing chart index
+        run: |
+          mkdir -p public
+          if curl -fsSL -o public/index.yaml "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/index.yaml"; then
+            echo "Fetched existing index.yaml"
+          else
+            echo "No existing index.yaml found; starting fresh"
+          fi
+
+      - name: Package chart
+        run: |
+          mkdir -p .cr-release-packages
+          helm dependency update deploy/chart
+          helm package deploy/chart --destination .cr-release-packages
+
+      - name: Update chart repository index
+        run: |
+          cp .cr-release-packages/*.tgz public/
+          if [ -f public/index.yaml ]; then
+            helm repo index public \
+              --url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" \
+              --merge public/index.yaml
+          else
+            helm repo index public \
+              --url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
