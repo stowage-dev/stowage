@@ -40,10 +40,38 @@ jobs:
         run: go test -race ./...
 
       - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+        # `go run honnef.co/go/tools/cmd/staticcheck@latest` downgrades the
+        # toolchain to whatever staticcheck's go.mod minimum requires
+        # (currently go1.25). When the resulting binary then tries to
+        # analyze this repo (go 1.26), it errors out with
+        # "package requires newer Go version go1.26". Forcing
+        # GOTOOLCHAIN=go1.26.0 on the install build pins staticcheck to
+        # the same toolchain the project uses, so its stdlib view matches.
+        # Bump this pin in lockstep with the project's `go` directive.
+        run: |
+          GOTOOLCHAIN=go1.26.0 go install honnef.co/go/tools/cmd/staticcheck@latest
+          "$(go env GOPATH)/bin/staticcheck" ./...
 
-  envtest:
-    name: envtest (operator + s3proxy)
+  chart:
+    name: Helm chart (lint + template)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Run chart tests
+        run: go test -count=1 -timeout 5m ./test/chart/...
+
+  e2e:
+    name: e2e (kind, operator + s3proxy + webhook)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -58,21 +86,39 @@ jobs:
           mkdir -p web/dist
           [ -f web/dist/index.html ] || echo '<!doctype html><title>stowage</title>' > web/dist/index.html
 
-      # Pin kube-apiserver/etcd to the same minor as the operator's controller-runtime
-      # build target. setup-envtest caches binaries under ~/.local/share/kubebuilder-envtest.
-      - name: Install setup-envtest
-        run: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+      # helm/kind-action spins up a kind cluster, writes kubeconfig, and
+      # exposes the cluster name for follow-up steps. Kind v0.26 is the
+      # first release with kubernetes v1.32 node images; pin both so local
+      # `make e2e` and CI run against the same matrix.
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.26.0
+          node_image: kindest/node:v1.32.0
+          cluster_name: stowage-e2e
+          wait: 120s
 
-      - name: Download kubebuilder assets
-        id: envtest
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Bootstrap CRDs + host.docker.internal
+        id: bootstrap
         run: |
-          path=$("$(go env GOPATH)/bin/setup-envtest" use 1.32.0 -p path)
-          echo "path=$path" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # Reuse the same bootstrap script the Makefile uses — it skips
+          # cluster creation when one already exists (kind-action created
+          # ours) and emits env exports we forward into GITHUB_ENV.
+          ./scripts/e2e-bootstrap.sh | tee bootstrap.env
+          # Filter to well-formed `export KEY=VALUE` lines before
+          # forwarding to GITHUB_ENV. Without the filter, any stray
+          # stdout from the script (a stale diagnostic line, an
+          # unredirected command's output) would land in GITHUB_ENV as
+          # a malformed entry and fail the step with "Invalid format".
+          grep -E '^export [A-Z_][A-Z0-9_]*=' bootstrap.env \
+            | sed 's/^export //' >> "$GITHUB_ENV"
 
-      - name: Run envtest suite
-        env:
-          KUBEBUILDER_ASSETS: ${{ steps.envtest.outputs.path }}
-        run: go test -tags envtest -timeout 10m ./internal/operator/... ./internal/s3proxy/...
+      - name: Run e2e suite
+        run: go test -tags e2e -timeout 15m -count=1 ./test/e2e/...
 
   frontend:
     name: SvelteKit (lint, build)
@@ -94,7 +140,7 @@ jobs:
   docker:
     name: Build & publish main image
     runs-on: ubuntu-latest
-    needs: [go, envtest, frontend]
+    needs: [go, chart, e2e, frontend]
     # Tag publishes are handled by oci-release.yml (multi-arch + signed).
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:

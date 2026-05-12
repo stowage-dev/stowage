@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Damian van der Merwe
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//go:build envtest
+//go:build e2e
 
-package envtest
+package e2e
 
 import (
 	"fmt"
@@ -14,31 +14,38 @@ import (
 	"testing"
 )
 
-// FakeS3 is a tiny S3-shaped HTTP server that satisfies the bucket-level calls
-// the operator's reconcilers make: HeadBucket, CreateBucket, DeleteBucket,
-// ListBuckets, plus the empty/list hooks called from the deletion path. It
-// does not implement object storage and does not validate SigV4.
+// FakeS3 is a tiny S3-shaped HTTP server that satisfies the bucket-level
+// calls the operator's reconcilers make: HeadBucket, CreateBucket,
+// DeleteBucket, ListBuckets, plus the empty/list hooks called from the
+// deletion path. It does not implement object storage and does not validate
+// SigV4.
 //
 // Why not the official aws-sdk-go-v2 mock or MinIO?
 //   - The mock packages aren't general-purpose HTTP fakes.
-//   - MinIO would pull in a binary dependency for what is, in this codebase,
-//     four endpoints' worth of behaviour.
+//   - MinIO would pull in a container dependency for what is, in this
+//     codebase, four endpoints' worth of behaviour. We do install MinIO in
+//     CI for the chart-install lane, but the in-process operator tests
+//     don't need a real S3.
 //
-// FakeS3 lets the controller suite exercise the real AWS SDK signing path,
-// the real Classify error mapping, and the real reconcile loop while keeping
-// the test self-contained.
+// FakeS3 lets the e2e suite exercise the real AWS SDK signing path, the
+// real backend.Classify error mapping, and the real reconcile loop while
+// keeping the in-process tests self-contained.
 type FakeS3 struct {
 	server *httptest.Server
 
 	mu      sync.Mutex
 	buckets map[string]struct{}
-	// failHead, when non-empty, returns 500 for HeadBucket against the matching
-	// name. Useful for the "endpoint unreachable" reconcile path.
+	// failHead, when non-empty, returns 500 for HeadBucket against the
+	// matching name. Useful for the "endpoint unreachable" reconcile path.
 	failHead string
 }
 
-// NewFakeS3 starts a fake S3 server. The returned server is registered for
-// teardown on test cleanup; the URL is suitable for S3Backend.spec.endpoint.
+// NewFakeS3 starts a fake S3 server. The server is registered for teardown
+// on test cleanup; the URL is suitable for S3Backend.spec.endpoint.
+//
+// The server binds to 127.0.0.1 on a random port, which is reachable from
+// the in-process operator manager running in the same `go test` binary —
+// the apiserver itself never needs to call out to it.
 func NewFakeS3(t *testing.T) *FakeS3 {
 	t.Helper()
 	f := &FakeS3{buckets: map[string]struct{}{}}
@@ -65,8 +72,8 @@ func (f *FakeS3) HasBucket(name string) bool {
 	return ok
 }
 
-// FailHeadFor configures HeadBucket to return 500 for the named bucket. Used
-// to drive the reconciler into the "creation inconsistent" branch.
+// FailHeadFor configures HeadBucket to return 500 for the named bucket.
+// Used to drive the reconciler into the "creation inconsistent" branch.
 func (f *FakeS3) FailHeadFor(name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

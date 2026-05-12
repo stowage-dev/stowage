@@ -438,7 +438,7 @@ func (s *Server) buildPostUpstream(ctx context.Context, backendURL *url.URL, buc
 		"cache-control", "content-disposition", "content-encoding", "expires",
 	} {
 		if v := fields[h]; v != "" {
-			req.Header.Set(http.CanonicalHeaderKey(h), v)
+			req.Header.Set(h, v)
 		}
 	}
 	for _, h := range []string{
@@ -446,13 +446,13 @@ func (s *Server) buildPostUpstream(ctx context.Context, backendURL *url.URL, buc
 		"x-amz-website-redirect-location", "x-amz-tagging",
 	} {
 		if v := fields[h]; v != "" {
-			req.Header.Set(http.CanonicalHeaderKey(h), v)
+			req.Header.Set(h, v)
 		}
 	}
 	// User metadata: every form field whose name starts with x-amz-meta-.
 	for k, v := range fields {
 		if strings.HasPrefix(k, "x-amz-meta-") {
-			req.Header.Set(http.CanonicalHeaderKey(k), v)
+			req.Header.Set(k, v)
 		}
 	}
 	return req, nil

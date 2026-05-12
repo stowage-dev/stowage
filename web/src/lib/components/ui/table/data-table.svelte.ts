@@ -30,6 +30,7 @@ import {
 	type Updater,
 	type VisibilityState
 } from '@tanstack/table-core';
+import { SvelteSet } from 'svelte/reactivity';
 import type { Column } from './types';
 
 export interface CreateDataTableOptions<TData extends RowData> extends Omit<
@@ -193,7 +194,7 @@ function mergeObjects<Sources extends readonly MaybeThunk<object>[]>(
 			return !!findSourceWithKey(key);
 		},
 		ownKeys() {
-			const all = new Set<string | symbol>();
+			const all = new SvelteSet<string | symbol>();
 			for (const s of sources) {
 				const obj = resolve(s as MaybeThunk<object>);
 				if (obj) for (const k of Reflect.ownKeys(obj)) all.add(k);

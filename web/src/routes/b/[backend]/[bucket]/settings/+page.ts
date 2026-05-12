@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { ApiClient } from '$lib/api';
-import type { BucketQuota, BucketSizeTracking, CORSRule, LifecycleRule } from '$lib/types';
+import type { CORSRule, LifecycleRule } from '$lib/types';
 import type { PageLoad } from './$types';
 
 export type Loadable<T> = { value: T | null; error: string | null };
