@@ -53,14 +53,32 @@ jobs:
         with:
           version: v3.16.2
 
-      - name: Fetch existing chart index
+      - name: Restore previously published charts
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           mkdir -p public
-          if curl -fsSL -o public/index.yaml "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/index.yaml"; then
-            echo "Fetched existing index.yaml"
-          else
-            echo "No existing index.yaml found; starting fresh"
+          if ! curl -fsSL -o /tmp/old-index.yaml "${PAGES_URL}/index.yaml"; then
+            echo "No existing index.yaml; starting fresh"
+            exit 0
           fi
+          echo "Found existing index.yaml; restoring referenced tarballs"
+          # Each Pages deploy replaces the whole site, so previously
+          # published .tgz files vanish unless we re-upload them. Pull
+          # every URL the old index references; entries whose tarball
+          # is gone get dropped so the regenerated index stays honest.
+          mapfile -t urls < <(yq -r '.entries[][].urls[]' /tmp/old-index.yaml)
+          for url in "${urls[@]}"; do
+            [ -z "$url" ] && continue
+            fname=$(basename "$url")
+            [ -f "public/$fname" ] && continue
+            if curl -fsSL -o "public/$fname" "$url"; then
+              echo "  restored $fname"
+            else
+              echo "  drop (missing) $fname"
+              rm -f "public/$fname"
+            fi
+          done
 
       - name: Package chart
         env:
@@ -74,16 +92,13 @@ jobs:
             --app-version "${CHART_VERSION}"
 
       - name: Update chart repository index
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           cp .cr-release-packages/*.tgz public/
-          if [ -f public/index.yaml ]; then
-            helm repo index public \
-              --url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" \
-              --merge public/index.yaml
-          else
-            helm repo index public \
-              --url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          fi
+          # Regenerate from scratch (no --merge) so entries whose .tgz
+          # was missing in the restore step don't get re-added.
+          helm repo index public --url "${PAGES_URL}"
 
       - uses: actions/configure-pages@v5
 
