@@ -1,0 +1,50 @@
+{{/*
+  Optional Ingress for the embedded S3 proxy. Separate from the dashboard
+  ingress because the proxy lives on its own Service port (s3 → 8090) and
+  virtual-hosted-style clients need a wildcard host so the bucket
+  subdomain (bucket.<publicHostname>) routes to the same backend.
+
+  Renders only when s3Proxy.ingress.enabled is true AND publicHostname is
+  set — without a hostname the ingress has nothing to attach to and the
+  proxy stays cluster-internal.
+*/}}
+{{- if and .Values.stowage.enabled .Values.s3Proxy.ingress.enabled .Values.s3Proxy.publicHostname -}}
+{{- $tlsSecret := default "stowage-s3-ingress-tls" .Values.s3Proxy.ingress.tlsSecretName -}}
+{{- $hosts := concat (list .Values.s3Proxy.publicHostname) (.Values.s3Proxy.ingress.extraHosts | default (list)) -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stowage-s3
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "stowage.dashboardLabels" . | nindent 4 }}
+  {{- with .Values.s3Proxy.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.s3Proxy.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.s3Proxy.ingress.tls }}
+  tls:
+    - hosts:
+        {{- range $hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ $tlsSecret | quote }}
+  {{- end }}
+  rules:
+    {{- range $hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: stowage
+                port:
+                  name: s3
+    {{- end }}
+{{- end }}

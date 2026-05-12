@@ -240,11 +240,14 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Server, 
 			s3kubeSource = ks
 		}
 		s3CredDeps = &api.S3CredentialDeps{
-			Store:    store,
-			Sealer:   sealer,
-			Reloader: s3sqliteSource,
-			Audit:    auditRec,
-			Logger:   logger,
+			Store:          store,
+			Sealer:         sealer,
+			Reloader:       s3sqliteSource,
+			Audit:          auditRec,
+			Logger:         logger,
+			PublicHostname: cfg.S3Proxy.PublicHostname,
+			ProxyURL:       cfg.Operator.ProxyURL,
+			Registry:       registry,
 		}
 		s3AnonDeps = &api.S3AnonymousDeps{
 			Store:    store,
@@ -253,8 +256,11 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Server, 
 			Logger:   logger,
 		}
 		s3ProxyViewDeps = &api.S3ProxyViewDeps{
-			Store:  store,
-			Logger: logger,
+			Store:          store,
+			Logger:         logger,
+			PublicHostname: cfg.S3Proxy.PublicHostname,
+			ProxyURL:       cfg.Operator.ProxyURL,
+			Registry:       registry,
 		}
 		if s3kubeSource != nil {
 			s3ProxyViewDeps.OperatorSource = s3kubeSource
@@ -364,6 +370,7 @@ func (s *Server) buildS3Proxy(
 		HostSuffixes:         cfg.HostSuffixes,
 		BucketCreated:        time.Now().UTC(),
 		AnonymousEnabled:     cfg.AnonymousEnabled,
+		PublicHostname:       cfg.PublicHostname,
 		TrustedProxies:       trustedProxies,
 		Audit:                audit,
 		Quotas:               quotaSvc,
@@ -421,11 +428,12 @@ func (s *Server) Run(ctx context.Context) error {
 		pending++
 		go func() {
 			errCh <- opmgr.Start(ctx, opmgr.Config{
-				Kubeconfig:   s.cfg.Operator.Kubeconfig,
-				MetricsAddr:  s.cfg.Operator.MetricsAddr,
-				OpsNamespace: s.cfg.Operator.OpsNamespace,
-				ProxyURL:     s.cfg.Operator.ProxyURL,
-				Registry:     s.registry,
+				Kubeconfig:     s.cfg.Operator.Kubeconfig,
+				MetricsAddr:    s.cfg.Operator.MetricsAddr,
+				OpsNamespace:   s.cfg.Operator.OpsNamespace,
+				ProxyURL:       s.cfg.Operator.ProxyURL,
+				PublicHostname: s.cfg.S3Proxy.PublicHostname,
+				Registry:       s.registry,
 				Webhook: opmgr.WebhookConfig{
 					Enabled: s.cfg.Operator.Webhook.Enabled,
 					Port:    s.cfg.Operator.Webhook.Port,

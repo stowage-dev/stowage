@@ -319,7 +319,7 @@ func (s *Server) servePostObject(w http.ResponseWriter, r *http.Request, route R
 	// the upstream PUT's empty body to the client.
 	_, _ = io.Copy(io.Discard, resp.Body)
 
-	status := writePostSuccess(w, route, key, etag, versionID, fields, redirect, r)
+	status := writePostSuccess(w, route, key, etag, versionID, fields, redirect, r, s.cfg.PublicHostname)
 	out.status, out.result = status, "ok"
 
 	if s.cfg.Quotas != nil && counter.total > 0 {
@@ -510,7 +510,7 @@ type postObjectResponse struct {
 // scheme so it matches the URL the client actually reached the proxy on.
 // X-Forwarded-Proto is honored on plain-HTTP inbound requests (typical
 // when a TLS-terminating ingress sits in front of stowage).
-func writePostSuccess(w http.ResponseWriter, route RouteInfo, key, etag, versionID string, fields map[string]string, redirect *url.URL, r *http.Request) int {
+func writePostSuccess(w http.ResponseWriter, route RouteInfo, key, etag, versionID string, fields map[string]string, redirect *url.URL, r *http.Request, publicHostname string) int {
 	if etag != "" {
 		w.Header().Set("ETag", etag)
 	}
@@ -542,7 +542,7 @@ func writePostSuccess(w http.ResponseWriter, route RouteInfo, key, etag, version
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusCreated)
 		_ = xml.NewEncoder(w).Encode(postObjectResponse{
-			Location: inboundObjectLocation(r, route, key),
+			Location: inboundObjectLocation(r, route, key, publicHostname),
 			Bucket:   route.Bucket,
 			Key:      key,
 			ETag:     etag,
@@ -565,7 +565,12 @@ func writePostSuccess(w http.ResponseWriter, route RouteInfo, key, etag, version
 // Path layout follows the inbound addressing style: virtual-hosted
 // requests put the bucket in the host, so the URL path is just the key;
 // path-style requests prefix the path with the bucket.
-func inboundObjectLocation(r *http.Request, route RouteInfo, key string) string {
+//
+// publicHostname, when non-empty, overrides r.Host. Path-style requests
+// substitute the host directly; virtual-hosted requests prepend the
+// bucket subdomain to the configured value so the Location still
+// addresses the right bucket.
+func inboundObjectLocation(r *http.Request, route RouteInfo, key, publicHostname string) string {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -573,6 +578,13 @@ func inboundObjectLocation(r *http.Request, route RouteInfo, key string) string 
 		scheme = "https"
 	}
 	host := r.Host
+	if publicHostname != "" {
+		if route.PathStyle {
+			host = publicHostname
+		} else {
+			host = route.Bucket + "." + publicHostname
+		}
+	}
 	loc := &url.URL{Scheme: scheme, Host: host}
 	if route.PathStyle {
 		loc.Path = BuildOutboundPath(route.Bucket, key)

@@ -136,10 +136,11 @@ func runOperator(args []string) error {
 		"ops_namespace", cfg.Operator.OpsNamespace,
 	)
 	if err := opmgr.Start(ctx, opmgr.Config{
-		Kubeconfig:   cfg.Operator.Kubeconfig,
-		MetricsAddr:  cfg.Operator.MetricsAddr,
-		OpsNamespace: cfg.Operator.OpsNamespace,
-		ProxyURL:     cfg.Operator.ProxyURL,
+		Kubeconfig:     cfg.Operator.Kubeconfig,
+		MetricsAddr:    cfg.Operator.MetricsAddr,
+		OpsNamespace:   cfg.Operator.OpsNamespace,
+		ProxyURL:       cfg.Operator.ProxyURL,
+		PublicHostname: cfg.S3Proxy.PublicHostname,
 		Webhook: opmgr.WebhookConfig{
 			Enabled: cfg.Operator.Webhook.Enabled,
 			Port:    cfg.Operator.Webhook.Port,

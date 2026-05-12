@@ -61,6 +61,14 @@ type Config struct {
 	RequestIDFn   func() string
 	BucketCreated time.Time
 
+	// PublicHostname, when non-empty, replaces the inbound r.Host in
+	// the Location header emitted by a successful POST Object upload
+	// (success_action_status=201 / success_action_redirect). For
+	// virtual-hosted requests the bucket subdomain is prepended; for
+	// path-style the host is substituted directly. Scheme is unchanged
+	// (still derived from r.TLS / X-Forwarded-Proto).
+	PublicHostname string
+
 	// AnonymousEnabled is the cluster-wide kill switch. When false, the
 	// proxy never enters the anonymous path even if a binding exists.
 	AnonymousEnabled bool

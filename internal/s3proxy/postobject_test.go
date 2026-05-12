@@ -286,6 +286,109 @@ func TestPostObject_Location_VirtualHosted(t *testing.T) {
 		"virtual-hosted location should be host-only, no bucket prefix in path")
 }
 
+// TestPostObject_Location_PublicHostname_PathStyle confirms that a
+// configured s3_proxy.public_hostname replaces the inbound r.Host in
+// the 201 Location for a path-style request. Scheme still follows
+// X-Forwarded-Proto / r.TLS.
+func TestPostObject_Location_PublicHostname_PathStyle(t *testing.T) {
+	ups := httptest.NewServer(newUpstream())
+	defer ups.Close()
+	vc := newPostCred()
+	src := &fakeSource{
+		byAKID: map[string]*VirtualCredential{vc.AccessKeyID: vc},
+		byAnon: map[string]*AnonymousBinding{},
+	}
+	br := NewBackendResolver(&stubBackendLookup{endpointURL: ups.URL})
+	srv := NewServer(Config{
+		Source:         src,
+		Backends:       br,
+		Limiter:        NewLimiter(0, 0),
+		IPLimiter:      NewIPLimiter(0),
+		Metrics:        NewMetrics(prometheus.NewRegistry()),
+		Log:            testr.New(t),
+		BucketCreated:  time.Now(),
+		PublicHostname: "s3.example.com",
+		AdminCredsOverride: func(_ context.Context, _ BackendSpec) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "admin", SecretAccessKey: "secret"}, nil
+		},
+	})
+	proxy := httptest.NewServer(srv)
+	defer proxy.Close()
+
+	form := buildSignedPostForm(t, testPostAKID, testPostSecret, testPostBucket,
+		"k", []string{
+			`{"bucket":"` + testPostBucket + `"}`,
+			`{"key":"k"}`,
+			`{"success_action_status":"201"}`,
+		},
+		map[string]string{"success_action_status": "201"},
+		[]byte("x"))
+
+	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/"+testPostBucket, form.body)
+	req.Header.Set("Content-Type", form.contentType)
+	// Pretend the proxy was reached at an internal hostname via TLS.
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Host = "internal.local"
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var pr postObjectResponse
+	require.NoError(t, xml.NewDecoder(resp.Body).Decode(&pr))
+	require.Equal(t, "https://s3.example.com/"+testPostBucket+"/k", pr.Location)
+}
+
+// TestPostObject_Location_PublicHostname_VirtualHosted confirms that
+// for a virtual-hosted inbound request the bucket subdomain is
+// prepended to the configured public hostname.
+func TestPostObject_Location_PublicHostname_VirtualHosted(t *testing.T) {
+	ups := httptest.NewServer(newUpstream())
+	defer ups.Close()
+	src := &fakeSource{
+		byAKID: map[string]*VirtualCredential{testPostAKID: newPostCred()},
+		byAnon: map[string]*AnonymousBinding{},
+	}
+	src.byAKID[testPostAKID].BucketScopes = []BucketScope{{BucketName: "b", BackendName: testBackend}}
+	br := NewBackendResolver(&stubBackendLookup{endpointURL: ups.URL})
+	srv := NewServer(Config{
+		Source:         src,
+		Backends:       br,
+		Limiter:        NewLimiter(0, 0),
+		IPLimiter:      NewIPLimiter(0),
+		Metrics:        NewMetrics(prometheus.NewRegistry()),
+		Log:            testr.New(t),
+		HostSuffixes:   []string{"uploads.test"},
+		BucketCreated:  time.Now(),
+		PublicHostname: "s3.example.com",
+		AdminCredsOverride: func(_ context.Context, _ BackendSpec) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "admin", SecretAccessKey: "secret"}, nil
+		},
+	})
+	proxy := httptest.NewServer(srv)
+	defer proxy.Close()
+
+	form := buildSignedPostForm(t, testPostAKID, testPostSecret, "b",
+		"file.bin", []string{
+			`{"bucket":"b"}`,
+			`{"key":"file.bin"}`,
+			`{"success_action_status":"201"}`,
+		},
+		map[string]string{"success_action_status": "201"},
+		[]byte("x"))
+
+	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/", form.body)
+	req.Header.Set("Content-Type", form.contentType)
+	req.Host = "b.uploads.test"
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var pr postObjectResponse
+	require.NoError(t, xml.NewDecoder(resp.Body).Decode(&pr))
+	require.Equal(t, "http://b.s3.example.com/file.bin", pr.Location,
+		"virtual-hosted location should prepend bucket subdomain to public_hostname")
+}
+
 func TestPostObject_SuccessActionRedirect(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()

@@ -48,8 +48,15 @@ type Config struct {
 	OpsNamespace string
 
 	// ProxyURL is the in-cluster URL the operator writes into consumer
-	// Secrets so workloads know where to send S3 traffic.
+	// Secrets so workloads know where to send S3 traffic. Used as the
+	// fallback when PublicHostname is empty.
 	ProxyURL string
+
+	// PublicHostname, when set, replaces ProxyURL in the consumer-facing
+	// AWS_ENDPOINT_URL so workloads outside the cluster (or behind an
+	// ingress) reach the proxy via its external hostname. Bare host, no
+	// scheme — proxyurl.Resolve assumes https.
+	PublicHostname string
 
 	// Registry, when non-nil, opts in to mirroring S3Backend CRs into the
 	// in-process backend registry as read-only entries. Headless deployments
@@ -123,9 +130,10 @@ func Start(ctx context.Context, cfg Config, logger *slog.Logger) error {
 		Scheme:   mgr.GetScheme(),
 		Resolver: resolver,
 		Writer:   writer,
-		Recorder: recorder,
-		ProxyURL: cfg.ProxyURL,
-		OpsNS:    cfg.OpsNamespace,
+		Recorder:       recorder,
+		ProxyURL:       cfg.ProxyURL,
+		PublicHostname: cfg.PublicHostname,
+		OpsNS:          cfg.OpsNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("setup BucketClaim controller: %w", err)
 	}

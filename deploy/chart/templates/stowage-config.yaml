@@ -20,6 +20,7 @@
     "s3_proxy" (dict
         "enabled" true
         "listen"  ":8090"
+        "public_hostname" (default "" .Values.s3Proxy.publicHostname)
         "kubernetes" (dict
             "enabled"   .Values.operator.enabled
             "namespace" .Release.Namespace))

@@ -42,7 +42,7 @@ func (d *S3CredentialDeps) handleMyList(w http.ResponseWriter, r *http.Request) 
 		if !c.UserID.Valid || c.UserID.String != id.UserID {
 			continue
 		}
-		out = append(out, credToDTO(c))
+		out = append(out, d.credToDTO(c))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"credentials": out})
 }
@@ -145,7 +145,7 @@ func (d *S3CredentialDeps) handleMyCreate(w http.ResponseWriter, r *http.Request
 		},
 	})
 
-	dto := credToDTO(c)
+	dto := d.credToDTO(c)
 	dto.SecretKey = secret
 	writeJSON(w, http.StatusCreated, dto)
 }
@@ -233,7 +233,7 @@ func (d *S3CredentialDeps) handleMyPatch(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, "internal", "could not reload credential", "")
 		return
 	}
-	writeJSON(w, http.StatusOK, credToDTO(row))
+	writeJSON(w, http.StatusOK, d.credToDTO(row))
 }
 
 func (d *S3CredentialDeps) handleMyDelete(w http.ResponseWriter, r *http.Request) {

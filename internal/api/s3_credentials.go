@@ -18,6 +18,8 @@ import (
 
 	"github.com/stowage-dev/stowage/internal/audit"
 	"github.com/stowage-dev/stowage/internal/auth"
+	"github.com/stowage-dev/stowage/internal/backend"
+	"github.com/stowage-dev/stowage/internal/proxyurl"
 	"github.com/stowage-dev/stowage/internal/secrets"
 	"github.com/stowage-dev/stowage/internal/store/sqlite"
 )
@@ -38,26 +40,39 @@ type S3CredentialDeps struct {
 	Reloader SourceReloader
 	Audit    audit.Recorder
 	Logger   *slog.Logger
+	// PublicHostname and ProxyURL feed the URL hints rendered into each
+	// credential DTO so the dashboard can show users the address their
+	// bucket lives at. Both optional — when neither is set, endpoint_url
+	// and bucket_urls are omitted entirely.
+	PublicHostname string
+	ProxyURL       string
+	// Registry is consulted for the backend's addressing-style flag so
+	// per-bucket URLs reflect path-style vs virtual-hosted addressing.
+	// nil disables the per-bucket map; the base endpoint URL is still
+	// emitted from the strings above.
+	Registry *backend.Registry
 }
 
 // s3CredDTO is the shape returned to the dashboard. SecretKey is populated
 // only by the create response (server-generated, shown once).
 type s3CredDTO struct {
-	AccessKey   string   `json:"access_key"`
-	SecretKey   string   `json:"secret_key,omitempty"`
-	BackendID   string   `json:"backend_id"`
-	Buckets     []string `json:"buckets"`
-	UserID      string   `json:"user_id,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Enabled     bool     `json:"enabled"`
-	ExpiresAt   string   `json:"expires_at,omitempty"`
-	CreatedAt   string   `json:"created_at"`
-	CreatedBy   string   `json:"created_by,omitempty"`
-	UpdatedAt   string   `json:"updated_at"`
-	UpdatedBy   string   `json:"updated_by,omitempty"`
+	AccessKey   string            `json:"access_key"`
+	SecretKey   string            `json:"secret_key,omitempty"`
+	BackendID   string            `json:"backend_id"`
+	Buckets     []string          `json:"buckets"`
+	UserID      string            `json:"user_id,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Enabled     bool              `json:"enabled"`
+	ExpiresAt   string            `json:"expires_at,omitempty"`
+	CreatedAt   string            `json:"created_at"`
+	CreatedBy   string            `json:"created_by,omitempty"`
+	UpdatedAt   string            `json:"updated_at"`
+	UpdatedBy   string            `json:"updated_by,omitempty"`
+	EndpointURL string            `json:"endpoint_url,omitempty"`
+	BucketURLs  map[string]string `json:"bucket_urls,omitempty"`
 }
 
-func credToDTO(c *sqlite.S3Credential) s3CredDTO {
+func (d *S3CredentialDeps) credToDTO(c *sqlite.S3Credential) s3CredDTO {
 	out := s3CredDTO{
 		AccessKey:   c.AccessKey,
 		BackendID:   c.BackendID,
@@ -81,7 +96,36 @@ func credToDTO(c *sqlite.S3Credential) s3CredDTO {
 	if buckets, err := c.UnmarshalBuckets(); err == nil {
 		out.Buckets = buckets
 	}
+	out.EndpointURL, out.BucketURLs = d.urls(c.BackendID, out.Buckets)
 	return out
+}
+
+// urls computes the base endpoint and per-bucket URLs for a credential.
+// Returns ("", nil) when no public_hostname / fallback URL is configured.
+// Per-bucket URLs reflect the backend's PathStyle flag — virtual-hosted
+// puts the bucket in the subdomain, path-style puts it in the URL path.
+func (d *S3CredentialDeps) urls(backendID string, buckets []string) (string, map[string]string) {
+	base := proxyurl.Resolve(d.PublicHostname, d.ProxyURL, "", false)
+	if base == "" {
+		return "", nil
+	}
+	if d.Registry == nil || len(buckets) == 0 {
+		return base, nil
+	}
+	target, ok, err := d.Registry.ProxyTarget(backendID)
+	if err != nil || !ok {
+		// Backend unknown to the registry (stale row, or registry not
+		// populated yet) — emit the base URL but skip the per-bucket
+		// map so the UI doesn't show a wrong addressing style.
+		return base, nil
+	}
+	out := make(map[string]string, len(buckets))
+	for _, b := range buckets {
+		if u := proxyurl.Resolve(d.PublicHostname, d.ProxyURL, b, target.PathStyle); u != "" {
+			out[b] = u
+		}
+	}
+	return base, out
 }
 
 func (d *S3CredentialDeps) handleList(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +141,7 @@ func (d *S3CredentialDeps) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]s3CredDTO, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, credToDTO(c))
+		out = append(out, d.credToDTO(c))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"credentials": out})
 }
@@ -200,7 +244,7 @@ func (d *S3CredentialDeps) handleCreate(w http.ResponseWriter, r *http.Request) 
 		},
 	})
 
-	dto := credToDTO(c)
+	dto := d.credToDTO(c)
 	dto.SecretKey = secret // visible only on the create response
 	writeJSON(w, http.StatusCreated, dto)
 }
@@ -283,7 +327,7 @@ func (d *S3CredentialDeps) handlePatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", "could not reload credential", "")
 		return
 	}
-	writeJSON(w, http.StatusOK, credToDTO(row))
+	writeJSON(w, http.StatusOK, d.credToDTO(row))
 }
 
 func (d *S3CredentialDeps) handleDelete(w http.ResponseWriter, r *http.Request) {

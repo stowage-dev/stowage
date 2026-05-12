@@ -393,6 +393,18 @@ export interface S3Credential {
 	created_by?: string;
 	updated_at: string;
 	updated_by?: string;
+	/**
+	 * Base proxy endpoint (the value for AWS_ENDPOINT_URL). Comes from
+	 * `s3_proxy.public_hostname` when set, otherwise the cluster-internal
+	 * `operator.proxy_url`. Empty/absent means neither is configured.
+	 */
+	endpoint_url?: string;
+	/**
+	 * Per-bucket access URLs computed with the credential's backend
+	 * addressing style — path-style buckets land under the path, virtual-
+	 * hosted buckets appear as a subdomain of `endpoint_url`'s host.
+	 */
+	bucket_urls?: Record<string, string>;
 }
 
 export interface CreateS3CredentialRequest {
@@ -434,6 +446,8 @@ export interface S3CredentialView {
 	source: S3CredentialSource;
 	claim_namespace?: string;
 	claim_name?: string;
+	endpoint_url?: string;
+	bucket_urls?: Record<string, string>;
 }
 
 export interface S3AnonymousBinding {
