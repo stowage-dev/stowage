@@ -31,7 +31,7 @@ storage:
 ingress:
   enabled: true
   className: ""
-  host: "stowage.rke2-prod.mustard.co.nz"
+  host: "stowage.example.com"
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   tls: true
