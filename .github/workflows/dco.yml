@@ -12,7 +12,7 @@ jobs:
     name: Check DCO sign-off
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Full history for the base..head walk below.
           fetch-depth: 0
