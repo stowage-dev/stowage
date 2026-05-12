@@ -21,6 +21,12 @@
 
 set -euo pipefail
 
+# Trace every command — the stderr trace is the easiest way to see which
+# step blew up in CI (where attaching to the container isn't possible).
+# Local devs running `make e2e` also get the trace, which is short
+# enough not to be noisy.
+set -x
+
 CLUSTER="${KIND_CLUSTER_NAME:-stowage-e2e}"
 KIND_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.32.0}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +42,10 @@ need() {
 need kind
 need kubectl
 need docker
+
+# Dump the existing kind cluster list so a CI-side mismatch (kind-action
+# named the cluster differently) is obvious from the trace.
+kind get clusters 2>&1 >&2 || true
 
 if kind get clusters 2>/dev/null | grep -qx "${CLUSTER}"; then
   echo "e2e-bootstrap: cluster '${CLUSTER}' already exists, reusing" >&2
