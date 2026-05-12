@@ -17,7 +17,7 @@ jobs:
     name: Build SvelteKit bundle
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1'
@@ -25,7 +25,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: web/dist
@@ -56,14 +56,14 @@ jobs:
             goarch: amd64
             ext: .exe
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: frontend-dist
           path: web/dist
@@ -83,7 +83,7 @@ jobs:
             ./cmd/stowage
           ls -lh "$out"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: stowage-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/stowage-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
@@ -95,9 +95,9 @@ jobs:
     needs: binaries
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: stowage-*
@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: Create or update release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           name: ${{ steps.tag.outputs.name }}
