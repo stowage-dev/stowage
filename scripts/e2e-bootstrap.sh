@@ -43,9 +43,12 @@ need kind
 need kubectl
 need docker
 
-# Dump the existing kind cluster list so a CI-side mismatch (kind-action
-# named the cluster differently) is obvious from the trace.
-kind get clusters 2>&1 >&2 || true
+# Dump the existing kind cluster list to stderr so a CI-side mismatch
+# (kind-action naming the cluster differently than we asked for) is
+# obvious from the trace. Critically this MUST NOT touch stdout: CI
+# parses the script's stdout into $GITHUB_ENV, and a stray cluster name
+# on stdout would land there as a malformed env line.
+kind get clusters >&2 2>&1 || true
 
 if kind get clusters 2>/dev/null | grep -qx "${CLUSTER}"; then
   echo "e2e-bootstrap: cluster '${CLUSTER}' already exists, reusing" >&2

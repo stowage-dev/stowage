@@ -99,9 +99,13 @@ jobs:
           # cluster creation when one already exists (kind-action created
           # ours) and emits env exports we forward into GITHUB_ENV.
           ./scripts/e2e-bootstrap.sh | tee bootstrap.env
-          # Strip the leading `export ` so GITHUB_ENV's KEY=VALUE syntax
-          # accepts the lines verbatim.
-          sed 's/^export //' bootstrap.env >> "$GITHUB_ENV"
+          # Filter to well-formed `export KEY=VALUE` lines before
+          # forwarding to GITHUB_ENV. Without the filter, any stray
+          # stdout from the script (a stale diagnostic line, an
+          # unredirected command's output) would land in GITHUB_ENV as
+          # a malformed entry and fail the step with "Invalid format".
+          grep -E '^export [A-Z_][A-Z0-9_]*=' bootstrap.env \
+            | sed 's/^export //' >> "$GITHUB_ENV"
 
       - name: Run e2e suite
         run: go test -tags e2e -timeout 15m -count=1 ./test/e2e/...
