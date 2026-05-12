@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Damian van der Merwe
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+
 import { ApiClient } from '$lib/api';
 import type { Backend, Bucket } from '$lib/types';
 
@@ -10,7 +12,7 @@ export type BucketState =
 	| { status: 'error'; message: string };
 
 const state = $state<Record<string, BucketState>>({});
-const inflight = new Map<string, AbortController>();
+const inflight = new SvelteMap<string, AbortController>();
 const api = new ApiClient();
 
 // One slow/dead backend mustn't gate the rest of the UI on its TCP timeout —
@@ -88,7 +90,7 @@ export function refreshBuckets(id?: string): void {
 
 /** Drop cache entries for backends that no longer exist. */
 export function reconcileBackends(ids: Iterable<string>): void {
-	const known = new Set(ids);
+	const known = new SvelteSet(ids);
 	for (const id of Object.keys(state)) {
 		if (!known.has(id)) {
 			inflight.get(id)?.abort();

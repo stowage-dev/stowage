@@ -22,6 +22,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { bucketList } from '$lib/stores/buckets.svelte';
 	import type { Backend, Endpoint } from '$lib/types';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {
 		backends: Backend[];
@@ -41,7 +42,7 @@
 	};
 
 	const rows = $derived.by<Row[]>(() => {
-		const m = new Map<string, Row>();
+		const m = new SvelteMap<string, Row>();
 		for (const b of backends) m.set(b.id, { id: b.id, name: b.name, backend: b });
 		if (admin) {
 			for (const e of admin.endpoints) {

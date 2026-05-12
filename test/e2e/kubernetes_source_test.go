@@ -1,11 +1,12 @@
 // Copyright (C) 2026 Damian van der Merwe
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//go:build envtest
+//go:build e2e
 
-package s3proxy_test
+package e2e
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -17,38 +18,40 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/stowage-dev/stowage/internal/operator/test/envtest"
 	"github.com/stowage-dev/stowage/internal/operator/vcstore"
 	"github.com/stowage-dev/stowage/internal/s3proxy"
 )
 
-// kubeconfigForCfg writes a kubeconfig file pointing at the envtest control
-// plane and returns the path. NewKubernetesSource takes a path because the
-// proxy production wiring doesn't have rest.Config in scope; this round-trips
-// through the same loader for parity.
-func kubeconfigForCfg(t *testing.T, suite *envtest.Suite) string {
+// kubeconfigForCluster writes a kubeconfig file pointing at the e2e
+// cluster and returns the path. s3proxy.NewKubernetesSource takes a path
+// because the production wiring doesn't have rest.Config in scope; this
+// round-trips through the same loader for parity.
+func kubeconfigForCluster(t *testing.T, c *Cluster) string {
 	t.Helper()
 	api := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"envtest": {
-				Server:                   suite.Cfg.Host,
-				CertificateAuthorityData: suite.Cfg.CAData,
-				InsecureSkipTLSVerify:    suite.Cfg.Insecure,
+			"e2e": {
+				Server:                   c.Cfg.Host,
+				CertificateAuthority:     c.Cfg.CAFile,
+				CertificateAuthorityData: c.Cfg.CAData,
+				InsecureSkipTLSVerify:    c.Cfg.Insecure,
 			},
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"envtest": {
-				ClientCertificateData: suite.Cfg.CertData,
-				ClientKeyData:         suite.Cfg.KeyData,
-				Token:                 suite.Cfg.BearerToken,
-				Username:              suite.Cfg.Username,
-				Password:              suite.Cfg.Password,
+			"e2e": {
+				ClientCertificate:     c.Cfg.CertFile,
+				ClientCertificateData: c.Cfg.CertData,
+				ClientKey:             c.Cfg.KeyFile,
+				ClientKeyData:         c.Cfg.KeyData,
+				Token:                 c.Cfg.BearerToken,
+				Username:              c.Cfg.Username,
+				Password:              c.Cfg.Password,
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"envtest": {Cluster: "envtest", AuthInfo: "envtest"},
+			"e2e": {Cluster: "e2e", AuthInfo: "e2e"},
 		},
-		CurrentContext: "envtest",
+		CurrentContext: "e2e",
 	}
 	dir := t.TempDir()
 	path := dir + "/kubeconfig"
@@ -103,26 +106,24 @@ func (f *fakeLimitObserver) deleteCount(backend, bucket string) int {
 
 // TestKubernetesSource_WireContract proves the operator → proxy informer
 // contract end-to-end against a real apiserver: write a Secret with the
-// operator's vcstore.Writer, then verify the proxy's KubernetesSource picks
-// it up via Lookup, exactly the way the production proxy will.
+// operator's vcstore.Writer, then verify the proxy's KubernetesSource
+// picks it up via Lookup, exactly the way the production proxy will.
 //
-// This is the critical integration test for the wire contract documented in
-// CLAUDE.md: "The operator and stowage share a wire contract on the K8s
-// Secret data fields … Changing one without the other breaks the informer
-// integration silently."
+// This is the critical integration test for the wire contract documented
+// in CLAUDE.md: "The operator and stowage share a wire contract on the
+// K8s Secret data fields … Changing one without the other breaks the
+// informer integration silently."
 func TestKubernetesSource_WireContract(t *testing.T) {
-	suite := envtest.Start(t)
-	ctx := envtest.WithTimeout(t, 90*time.Second)
+	c := MustConnect(t)
+	ctx := WithTimeout(t, 120*time.Second)
 
-	const opsNS = "stowage-system"
-	if err := suite.Client.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: opsNS}}); err != nil && !apierrors.IsAlreadyExists(err) {
-		t.Fatalf("create ns: %v", err)
-	}
+	opsNS := EnsureOpsNamespace(t, ctx, c.Client)
+	CleanupSecretsByLabels(t, c.Client, opsNS, vcLabelsForClaim("tenant-wire", "claim"))
 
 	observer := newFakeLimitObserver()
 	src, err := s3proxy.NewKubernetesSource(s3proxy.KubernetesSourceConfig{
 		Namespace:     opsNS,
-		Kubeconfig:    kubeconfigForCfg(t, suite),
+		Kubeconfig:    kubeconfigForCluster(t, c),
 		ResyncPeriod:  0,
 		LimitObserver: observer,
 	}, nil)
@@ -133,10 +134,7 @@ func TestKubernetesSource_WireContract(t *testing.T) {
 		t.Fatalf("start source: %v", err)
 	}
 
-	// Write a virtual credential through the operator's writer — this is the
-	// only way to guarantee parity with what the operator actually puts on
-	// the wire.
-	w := &vcstore.Writer{Client: suite.Client, Namespace: opsNS}
+	w := &vcstore.Writer{Client: c.Client, Namespace: opsNS}
 	vc := vcstore.VirtualCredential{
 		AccessKeyID:     "AKIAWIRE0001",
 		SecretAccessKey: "wiresecret",
@@ -152,8 +150,7 @@ func TestKubernetesSource_WireContract(t *testing.T) {
 		t.Fatalf("write VC: %v", err)
 	}
 
-	// Lookup should resolve.
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "proxy source resolves AKID",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "proxy source resolves AKID",
 		func() (bool, error) {
 			got, ok := src.Lookup(vc.AccessKeyID)
 			if !ok {
@@ -174,44 +171,38 @@ func TestKubernetesSource_WireContract(t *testing.T) {
 			return true, nil
 		})
 
-	// LimitObserver should have observed the quota.
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "limit observer sees quota",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "limit observer sees quota",
 		func() (bool, error) {
 			v, ok := observer.get(vc.BackendName, vc.BucketName)
 			return ok && v[0] == vc.QuotaSoftBytes && v[1] == vc.QuotaHardBytes, nil
 		})
 
-	// Delete the Secret — Lookup must miss and the limit observer must see
-	// the corresponding DeleteLimit.
 	if err := w.DeleteInternalByAccessKey(ctx, vc.AccessKeyID); err != nil {
 		t.Fatalf("delete VC: %v", err)
 	}
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "proxy source loses AKID",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "proxy source loses AKID",
 		func() (bool, error) {
 			_, ok := src.Lookup(vc.AccessKeyID)
 			return !ok, nil
 		})
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "limit observer saw delete",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "limit observer saw delete",
 		func() (bool, error) {
 			return observer.deleteCount(vc.BackendName, vc.BucketName) > 0, nil
 		})
 }
 
-// TestKubernetesSource_AnonymousBinding wires the anonymous-binding side of
-// the contract: the proxy must surface bindings keyed by bucket name once
-// the operator writes the Secret.
+// TestKubernetesSource_AnonymousBinding wires the anonymous-binding side
+// of the contract: the proxy must surface bindings keyed by bucket name
+// once the operator writes the Secret.
 func TestKubernetesSource_AnonymousBinding(t *testing.T) {
-	suite := envtest.Start(t)
-	ctx := envtest.WithTimeout(t, 60*time.Second)
+	c := MustConnect(t)
+	ctx := WithTimeout(t, 90*time.Second)
 
-	const opsNS = "stowage-system"
-	if err := suite.Client.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: opsNS}}); err != nil && !apierrors.IsAlreadyExists(err) {
-		t.Fatalf("create ns: %v", err)
-	}
+	opsNS := EnsureOpsNamespace(t, ctx, c.Client)
 
 	src, err := s3proxy.NewKubernetesSource(s3proxy.KubernetesSourceConfig{
 		Namespace:    opsNS,
-		Kubeconfig:   kubeconfigForCfg(t, suite),
+		Kubeconfig:   kubeconfigForCluster(t, c),
 		ResyncPeriod: 0,
 	}, nil)
 	if err != nil {
@@ -221,7 +212,7 @@ func TestKubernetesSource_AnonymousBinding(t *testing.T) {
 		t.Fatalf("start source: %v", err)
 	}
 
-	w := &vcstore.Writer{Client: suite.Client, Namespace: opsNS}
+	w := &vcstore.Writer{Client: c.Client, Namespace: opsNS}
 	binding := vcstore.AnonymousBinding{
 		BucketName:     "PublicReadOnly",
 		BackendName:    "primary",
@@ -234,10 +225,15 @@ func TestKubernetesSource_AnonymousBinding(t *testing.T) {
 	if err := w.WriteAnonymousBinding(ctx, binding); err != nil {
 		t.Fatalf("write binding: %v", err)
 	}
+	t.Cleanup(func() {
+		bg, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_ = w.DeleteAnonymousBindingByClaim(bg, "tenant-x", "pub")
+	})
 
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "proxy source resolves anon",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "proxy source resolves anon",
 		func() (bool, error) {
-			a, ok := src.LookupAnon("publicreadonly") // case-insensitive
+			a, ok := src.LookupAnon("publicreadonly")
 			if !ok {
 				return false, nil
 			}
@@ -250,29 +246,26 @@ func TestKubernetesSource_AnonymousBinding(t *testing.T) {
 	if err := w.DeleteAnonymousBindingByClaim(ctx, "tenant-x", "pub"); err != nil {
 		t.Fatalf("delete binding: %v", err)
 	}
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "proxy source loses anon",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "proxy source loses anon",
 		func() (bool, error) {
 			_, ok := src.LookupAnon("publicreadonly")
 			return !ok, nil
 		})
 }
 
-// TestKubernetesSource_BucketScopesJSON verifies the multi-bucket grant path:
-// a Secret with a bucket_scopes JSON field should expose every scope via
-// Lookup and publish a quota row per scope.
+// TestKubernetesSource_BucketScopesJSON verifies the multi-bucket grant
+// path: a Secret with a bucket_scopes JSON field should expose every
+// scope via Lookup and publish a quota row per scope.
 func TestKubernetesSource_BucketScopesJSON(t *testing.T) {
-	suite := envtest.Start(t)
-	ctx := envtest.WithTimeout(t, 60*time.Second)
+	c := MustConnect(t)
+	ctx := WithTimeout(t, 90*time.Second)
 
-	const opsNS = "stowage-system"
-	if err := suite.Client.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: opsNS}}); err != nil && !apierrors.IsAlreadyExists(err) {
-		t.Fatalf("create ns: %v", err)
-	}
+	opsNS := EnsureOpsNamespace(t, ctx, c.Client)
 
 	observer := newFakeLimitObserver()
 	src, err := s3proxy.NewKubernetesSource(s3proxy.KubernetesSourceConfig{
 		Namespace:     opsNS,
-		Kubeconfig:    kubeconfigForCfg(t, suite),
+		Kubeconfig:    kubeconfigForCluster(t, c),
 		ResyncPeriod:  0,
 		LimitObserver: observer,
 	}, nil)
@@ -283,13 +276,17 @@ func TestKubernetesSource_BucketScopesJSON(t *testing.T) {
 		t.Fatalf("start source: %v", err)
 	}
 
-	// Build the Secret manually — this path is what the operator's
-	// multi-bucket writer (not yet exposed) would emit. Until that path
-	// exists in production, we exercise the proxy-side parser directly.
 	const akid = "AKIAMULTI001"
-	if err := suite.Client.Create(ctx, &corev1.Secret{
+	secretName := vcstore.InternalSecretName(akid)
+	t.Cleanup(func() {
+		bg, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_ = c.Client.Delete(bg, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: opsNS, Name: secretName}})
+	})
+
+	if err := c.Client.Create(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      vcstore.InternalSecretName(akid),
+			Name:      secretName,
 			Namespace: opsNS,
 			Labels: map[string]string{
 				vcstore.LabelRole:        vcstore.RoleVirtualCredential,
@@ -315,7 +312,7 @@ func TestKubernetesSource_BucketScopesJSON(t *testing.T) {
 		t.Fatalf("create multi VC secret: %v", err)
 	}
 
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "proxy source surfaces both scopes",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "proxy source surfaces both scopes",
 		func() (bool, error) {
 			got, ok := src.Lookup(akid)
 			if !ok {
@@ -324,29 +321,26 @@ func TestKubernetesSource_BucketScopesJSON(t *testing.T) {
 			return len(got.BucketScopes) == 2, nil
 		})
 
-	// Both scopes should land in the limit observer.
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "limits per scope",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "limits per scope",
 		func() (bool, error) {
 			a, okA := observer.get("primary", "primary-bucket")
 			b, okB := observer.get("primary", "secondary-bucket")
 			return okA && okB && a == b && a[0] == 1024 && a[1] == 4096, nil
 		})
 
-	// Drop the Secret — both scope keys must be retracted from the observer.
-	if err := suite.Client.Delete(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: opsNS, Name: vcstore.InternalSecretName(akid)},
+	if err := c.Client.Delete(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: opsNS, Name: secretName},
 	}); err != nil {
 		t.Fatalf("delete multi VC secret: %v", err)
 	}
-	envtest.Eventually(t, 15*time.Second, 100*time.Millisecond, "limits retracted per scope",
+	Eventually(t, 30*time.Second, 100*time.Millisecond, "limits retracted per scope",
 		func() (bool, error) {
 			return observer.deleteCount("primary", "primary-bucket") > 0 &&
 				observer.deleteCount("primary", "secondary-bucket") > 0, nil
 		})
 
-	// Sanity: ensure the suite client truly removed the object.
 	var s corev1.Secret
-	err = suite.Client.Get(ctx, client.ObjectKey{Namespace: opsNS, Name: vcstore.InternalSecretName(akid)}, &s)
+	err = c.Client.Get(ctx, client.ObjectKey{Namespace: opsNS, Name: secretName}, &s)
 	if !apierrors.IsNotFound(err) {
 		t.Fatalf("expected NotFound after delete, got %v", err)
 	}

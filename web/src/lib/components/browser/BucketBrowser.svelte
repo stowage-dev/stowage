@@ -40,9 +40,10 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { bucketList } from '$lib/stores/buckets.svelte';
 	import type { Backend, BrowserItem, Bucket, BucketQuota, ListObjectsResult } from '$lib/types';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	// Per-folder size cache persists across navigations within the same session.
-	const folderSizeCache = new Map<string, number>();
+	const folderSizeCache = new SvelteMap<string, number>();
 
 	interface Props {
 		backend: Backend;
