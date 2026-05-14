@@ -63,6 +63,10 @@ s3Proxy:
     # hosted clients ("*.s3.example.com") or for adding a path-style
     # alias. publicHostname is always included; this list is appended.
     extraHosts: []
+  # CORS for the embedded S3 proxy is now configured per-bucket via the
+  # dashboard (Bucket settings → CORS) and stored in stowage's
+  # s3_bucket_cors table. The chart no longer renders a cluster-wide
+  # rule set; remove any pre-existing cors: block from your values.
 
 # Verbatim YAML merged on top of the chart's generated stowage config.yaml.
 # Use this for OIDC, audit sampling, rate-limit overrides, host suffixes,

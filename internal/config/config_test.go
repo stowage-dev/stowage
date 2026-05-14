@@ -82,3 +82,4 @@ func TestS3ProxyValidation_PublicHostnameBareHostOK(t *testing.T) {
 		t.Fatalf("host:port should be valid, got %v", err)
 	}
 }
+

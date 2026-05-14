@@ -10,50 +10,34 @@ import (
 	"time"
 )
 
-// CORSConfig governs how the proxy answers browser CORS preflight and
-// decorates same-origin responses. Nil disables CORS entirely: the proxy
-// passes OPTIONS through to the S3 dispatcher (which 4xx's it) and never
-// adds Access-Control-* headers.
+// BucketCORSRule is one CORS rule attached to a bucket. The proxy
+// evaluates inbound preflights against the union of rules a bucket has
+// across every backend it's configured on (cache layer takes care of
+// the union; this struct is just the wire shape).
 //
-// CORS is configured cluster-wide rather than per-bucket because stowage
-// doesn't (yet) carry per-bucket CORS configuration; an operator who
-// needs different rules for different buckets should front the proxy
-// with an ingress that does CORS.
-type CORSConfig struct {
-	// AllowedOrigins is the closed allowlist. A single "*" entry matches
-	// every origin and echoes "*" back; otherwise origin must equal one
-	// of the entries (case-sensitive, scheme+host+port) and that exact
-	// origin is echoed in Access-Control-Allow-Origin.
-	AllowedOrigins []string
+// AllowedOrigins entries match the request's Origin header exactly, with
+// "*" as the catch-all. AllowedMethods is the S3-permitted set
+// (GET/HEAD/PUT/POST/DELETE). AllowedHeaders / ExposeHeaders default to
+// a permissive SigV4 + POST-Object set when empty, mirroring what the
+// cluster-wide config used to do. MaxAgeSeconds <= 0 falls back to 600s.
+type BucketCORSRule struct {
+	AllowedOrigins []string `json:"allowed_origins"`
+	AllowedMethods []string `json:"allowed_methods"`
+	AllowedHeaders []string `json:"allowed_headers,omitempty"`
+	ExposeHeaders  []string `json:"expose_headers,omitempty"`
+	MaxAgeSeconds  int      `json:"max_age_seconds,omitempty"`
+}
 
-	// AllowedMethods is echoed in preflight responses. Defaults to the
-	// usual S3 set (GET, HEAD, PUT, POST, DELETE) when empty.
-	AllowedMethods []string
-
-	// AllowedHeaders is echoed in preflight responses. Defaults to a
-	// permissive set covering SigV4 (Authorization, x-amz-*) and POST
-	// Object (Content-Type, Content-Disposition, etc) when empty.
-	AllowedHeaders []string
-
-	// ExposedHeaders is sent on actual responses so JavaScript can read
-	// ETag, x-amz-version-id, and x-amz-request-id from the Response.
-	// Defaults to those three when empty.
-	ExposedHeaders []string
-
-	// MaxAge is the preflight cache duration the browser is told to
-	// honor. Defaults to 10 minutes.
-	MaxAge time.Duration
-
-	// AllowCredentials controls whether Access-Control-Allow-Credentials
-	// is set. Required to be false when AllowedOrigins is "*" — browsers
-	// reject the combination.
-	AllowCredentials bool
+// CORSSource is the read-only contract the proxy needs to answer a
+// preflight without involving the upstream backend. Implementations
+// (the SQLite source, tests) return the union of rules across every
+// backend that hosts the bucket — preflights are anonymous, so the
+// proxy can't tell which backend a future signed request will land on.
+type CORSSource interface {
+	LookupCORS(bucket string) ([]BucketCORSRule, bool)
 }
 
 var (
-	defaultCORSMethods = []string{
-		http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPost, http.MethodDelete,
-	}
 	defaultCORSHeaders = []string{
 		"Authorization",
 		"Content-Type",
@@ -79,14 +63,34 @@ var (
 	defaultCORSMaxAge = 10 * time.Minute
 )
 
-// allowedOrigin returns the value to echo in Access-Control-Allow-Origin,
-// or "" if origin is not allowed (or CORS is disabled, or no Origin
-// header was sent).
-func allowedOrigin(cfg *CORSConfig, origin string) string {
-	if cfg == nil || origin == "" {
-		return ""
+// matchCORSRule walks the rule list and returns the first rule whose
+// AllowedOrigins contains origin AND whose AllowedMethods contains
+// method, plus the value to echo in Access-Control-Allow-Origin
+// ("*" or the literal origin). Returns (nil, "") when nothing matches.
+// method == "" skips the method check — used by non-preflight responses
+// where the request's actual HTTP verb already authenticated the call.
+func matchCORSRule(rules []BucketCORSRule, origin, method string) (*BucketCORSRule, string) {
+	if origin == "" {
+		return nil, ""
 	}
-	for _, o := range cfg.AllowedOrigins {
+	for i := range rules {
+		ru := &rules[i]
+		allow := matchOrigin(ru.AllowedOrigins, origin)
+		if allow == "" {
+			continue
+		}
+		if method != "" && !sliceContainsFold(ru.AllowedMethods, method) {
+			continue
+		}
+		return ru, allow
+	}
+	return nil, ""
+}
+
+// matchOrigin returns "*" if the rule lists "*", the exact origin if it
+// lists origin, or "" otherwise.
+func matchOrigin(allowed []string, origin string) string {
+	for _, o := range allowed {
 		if o == "*" {
 			return "*"
 		}
@@ -97,55 +101,57 @@ func allowedOrigin(cfg *CORSConfig, origin string) string {
 	return ""
 }
 
-// handlePreflight answers a CORS preflight request. Returns true when
-// it consumed the response — in which case the caller must not invoke
-// the regular handler chain. A preflight with a disallowed origin or
-// with CORS disabled returns false; the request then falls through to
-// the normal S3 dispatch path, which will 4xx it.
-func handlePreflight(cfg *CORSConfig, w http.ResponseWriter, r *http.Request) bool {
-	if cfg == nil {
+func sliceContainsFold(haystack []string, needle string) bool {
+	for _, v := range haystack {
+		if strings.EqualFold(v, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// handlePreflight answers a CORS preflight request when one of the
+// bucket's rules permits the requested origin + method. Returns true
+// when it consumed the response. Non-preflight OPTIONS (no
+// Access-Control-Request-Method) and unknown buckets fall through to
+// the normal dispatcher, preserving pre-CORS behavior.
+func handlePreflight(rules []BucketCORSRule, w http.ResponseWriter, r *http.Request) bool {
+	if len(rules) == 0 {
 		return false
 	}
 	if r.Method != http.MethodOptions {
 		return false
 	}
-	origin := r.Header.Get("Origin")
-	allow := allowedOrigin(cfg, origin)
-	if allow == "" {
+	reqMethod := r.Header.Get("Access-Control-Request-Method")
+	if reqMethod == "" {
+		// OPTIONS without ACRM isn't a preflight — fall through.
 		return false
 	}
-	// A preflight must carry Access-Control-Request-Method. Treat the
-	// header's absence as a non-preflight OPTIONS and let it fall
-	// through — preserves any future S3-style OPTIONS handling.
-	if r.Header.Get("Access-Control-Request-Method") == "" {
+	rule, allow := matchCORSRule(rules, r.Header.Get("Origin"), reqMethod)
+	if rule == nil {
 		return false
 	}
 
 	h := w.Header()
 	h.Set("Access-Control-Allow-Origin", allow)
-	if cfg.AllowCredentials && allow != "*" {
-		h.Set("Access-Control-Allow-Credentials", "true")
-	}
-	methods := cfg.AllowedMethods
-	if len(methods) == 0 {
-		methods = defaultCORSMethods
-	}
+
+	methods := rule.AllowedMethods
 	h.Set("Access-Control-Allow-Methods", strings.Join(methods, ", "))
 
-	headers := cfg.AllowedHeaders
+	headers := rule.AllowedHeaders
 	if len(headers) == 0 {
 		headers = defaultCORSHeaders
 	}
 	h.Set("Access-Control-Allow-Headers", strings.Join(headers, ", "))
 
-	maxAge := cfg.MaxAge
+	maxAge := time.Duration(rule.MaxAgeSeconds) * time.Second
 	if maxAge <= 0 {
 		maxAge = defaultCORSMaxAge
 	}
 	h.Set("Access-Control-Max-Age", strconv.Itoa(int(maxAge.Seconds())))
 
-	// Some caches key on Origin; tell them so they don't serve the
-	// preflight response to a different origin's preflight.
+	// Caches must key on Origin (and the preflight headers) so a
+	// response cached for origin A doesn't leak to origin B.
 	h.Add("Vary", "Origin")
 	h.Add("Vary", "Access-Control-Request-Method")
 	h.Add("Vary", "Access-Control-Request-Headers")
@@ -154,29 +160,25 @@ func handlePreflight(cfg *CORSConfig, w http.ResponseWriter, r *http.Request) bo
 	return true
 }
 
-// decorateCORS adds Access-Control-Allow-Origin and Expose-Headers to a
-// non-preflight response when the origin is allowed. Safe to call before
-// the response has been written; it only writes headers, not the body.
-func decorateCORS(cfg *CORSConfig, w http.ResponseWriter, r *http.Request) {
-	if cfg == nil {
+// decorateCORS adds Access-Control-Allow-Origin + Expose-Headers to a
+// non-preflight response when one of the bucket's rules covers the
+// inbound origin. Method is not enforced here — the rule's
+// AllowedMethods is a preflight contract, and an actual cross-origin
+// request that survived auth has already been authorised.
+func decorateCORS(rules []BucketCORSRule, w http.ResponseWriter, r *http.Request) {
+	if len(rules) == 0 {
 		return
 	}
-	origin := r.Header.Get("Origin")
-	allow := allowedOrigin(cfg, origin)
-	if allow == "" {
+	rule, allow := matchCORSRule(rules, r.Header.Get("Origin"), "")
+	if rule == nil {
 		return
 	}
 	h := w.Header()
 	h.Set("Access-Control-Allow-Origin", allow)
-	if cfg.AllowCredentials && allow != "*" {
-		h.Set("Access-Control-Allow-Credentials", "true")
-	}
-	exposed := cfg.ExposedHeaders
+	exposed := rule.ExposeHeaders
 	if len(exposed) == 0 {
 		exposed = defaultCORSExposed
 	}
 	h.Set("Access-Control-Expose-Headers", strings.Join(exposed, ", "))
-	// Caches must vary on Origin so a request from origin A doesn't get
-	// served origin B's cached response.
 	h.Add("Vary", "Origin")
 }

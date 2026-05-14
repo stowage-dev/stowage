@@ -49,27 +49,24 @@ func phase2ServerWithQuotas(t *testing.T, withQuotas bool) (*httptest.Server, *m
 		t.Fatalf("register: %v", err)
 	}
 
-	var (
-		store *sqlite.Store
-		qsvc  *quotas.Service
-	)
+	// Always provision a SQLite store — bucket CORS is stored in
+	// s3_bucket_cors so even non-quota tests need it for round-trips.
+	s, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	store := s
+
+	var qsvc *quotas.Service
 	if withQuotas {
-		s, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
-		if err != nil {
-			t.Fatalf("sqlite: %v", err)
-		}
-		t.Cleanup(func() { _ = s.Close() })
-		store = s
 		limits := quotas.NewSQLiteLimitSource(store, slog.Default())
 		_ = limits.Reload(context.Background())
 		qsvc = quotas.New(limits, store, reg, slog.Default())
 	}
 
-	var rec audit.Recorder = audit.Noop{}
-	if store != nil {
-		rec = audit.NewSQLiteRecorder(store, slog.Default(), nil)
-	}
-	d := &BackendDeps{Registry: reg, Logger: slog.Default(), Quotas: qsvc, Audit: rec}
+	rec := audit.Recorder(audit.NewSQLiteRecorder(store, slog.Default(), nil))
+	d := &BackendDeps{Registry: reg, Logger: slog.Default(), Quotas: qsvc, Audit: rec, Store: store}
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {

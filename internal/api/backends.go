@@ -56,6 +56,12 @@ type BackendDeps struct {
 	Store  *sqlite.Store
 	Sealer *secrets.Sealer
 
+	// Reloader, when non-nil, is invoked after mutations that touch the
+	// proxy's in-memory caches (currently: bucket CORS). nil-safe — the
+	// next scheduled SQLiteSource tick will pick up the change at the
+	// cost of a brief staleness window.
+	Reloader SourceReloader
+
 	// BuildBackend lets tests plug in a memory backend instead of the
 	// production s3v4 driver. nil means "use s3v4".
 	BuildBackend func(ctx context.Context, row *sqlite.Backend, secretKey string) (backend.Backend, error)
