@@ -17,14 +17,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newCORSTestServer wraps newTestServer with a CORS config injected.
-func newCORSTestServer(t *testing.T, ups *httptest.Server, vc *VirtualCredential, cors *CORSConfig) *httptest.Server {
+// stubCORSSource serves a fixed bucket → rules map. Lookups for unknown
+// buckets return (nil, false), exercising the proxy's fall-through path.
+type stubCORSSource struct {
+	byBucket map[string][]BucketCORSRule
+}
+
+func (s *stubCORSSource) LookupCORS(bucket string) ([]BucketCORSRule, bool) {
+	if s == nil {
+		return nil, false
+	}
+	r, ok := s.byBucket[strings.ToLower(bucket)]
+	return r, ok
+}
+
+// newCORSTestServer wraps newTestServer with a per-bucket CORS source
+// injected. cors keys are bucket names; rules apply to anything routed
+// to that bucket (path-style or virtual-hosted).
+func newCORSTestServer(t *testing.T, ups *httptest.Server, vc *VirtualCredential, cors map[string][]BucketCORSRule) *httptest.Server {
 	t.Helper()
 	src := &fakeSource{
 		byAKID: map[string]*VirtualCredential{vc.AccessKeyID: vc},
 		byAnon: map[string]*AnonymousBinding{},
 	}
 	br := NewBackendResolver(&stubBackendLookup{endpointURL: ups.URL})
+	lower := make(map[string][]BucketCORSRule, len(cors))
+	for k, v := range cors {
+		lower[strings.ToLower(k)] = v
+	}
 	srv := NewServer(Config{
 		Source:        src,
 		Backends:      br,
@@ -34,7 +54,7 @@ func newCORSTestServer(t *testing.T, ups *httptest.Server, vc *VirtualCredential
 		Log:           testr.New(t),
 		HostSuffixes:  nil,
 		BucketCreated: time.Now(),
-		CORS:          cors,
+		CORSSource:    &stubCORSSource{byBucket: lower},
 		AdminCredsOverride: func(_ context.Context, _ BackendSpec) (aws.Credentials, error) {
 			return aws.Credentials{AccessKeyID: "admin", SecretAccessKey: "secret"}, nil
 		},
@@ -45,8 +65,11 @@ func newCORSTestServer(t *testing.T, ups *httptest.Server, vc *VirtualCredential
 func TestCORS_PreflightAllowedOrigin(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins: []string{"https://app.example.com"},
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"uploads": {{
+			AllowedOrigins: []string{"https://app.example.com"},
+			AllowedMethods: []string{"POST", "PUT"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -70,8 +93,11 @@ func TestCORS_PreflightAllowedOrigin(t *testing.T) {
 func TestCORS_PreflightWildcardOrigin(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins: []string{"*"},
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"uploads": {{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"POST"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -89,8 +115,11 @@ func TestCORS_PreflightWildcardOrigin(t *testing.T) {
 func TestCORS_PreflightDisallowedOriginFallsThrough(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins: []string{"https://approved.example.com"},
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"uploads": {{
+			AllowedOrigins: []string{"https://approved.example.com"},
+			AllowedMethods: []string{"POST"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -107,11 +136,36 @@ func TestCORS_PreflightDisallowedOriginFallsThrough(t *testing.T) {
 	require.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
 }
 
+func TestCORS_PreflightMethodMismatchFallsThrough(t *testing.T) {
+	// A rule that allows POST but the preflight asks for DELETE — the
+	// preflight should not be answered with success.
+	ups := httptest.NewServer(newUpstream())
+	defer ups.Close()
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"uploads": {{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"POST"},
+		}},
+	})
+	defer proxy.Close()
+
+	req, _ := http.NewRequest(http.MethodOptions, proxy.URL+"/uploads", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+	req.Header.Set("Access-Control-Request-Method", "DELETE")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.NotEqual(t, http.StatusNoContent, resp.StatusCode)
+}
+
 func TestCORS_PreflightMissingACRMFallsThrough(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins: []string{"*"},
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"uploads": {{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"POST"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -129,9 +183,12 @@ func TestCORS_PreflightMissingACRMFallsThrough(t *testing.T) {
 func TestCORS_DecoratesActualResponses(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins: []string{"https://app.example.com"},
-		ExposedHeaders: []string{"ETag", "x-custom"},
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		testPostBucket: {{
+			AllowedOrigins: []string{"https://app.example.com"},
+			AllowedMethods: []string{"POST"},
+			ExposeHeaders:  []string{"ETag", "x-custom"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -157,10 +214,10 @@ func TestCORS_DecoratesActualResponses(t *testing.T) {
 func TestCORS_DisabledByDefault(t *testing.T) {
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newTestServer(t, ups, newPostCred()) // no CORS config
+	proxy := newTestServer(t, ups, newPostCred()) // no CORSSource
 	defer proxy.Close()
 
-	// Preflight without CORS config: falls through to dispatcher.
+	// Preflight without a CORSSource: falls through to dispatcher.
 	req, _ := http.NewRequest(http.MethodOptions, proxy.URL+"/uploads", nil)
 	req.Header.Set("Origin", "https://app.example.com")
 	req.Header.Set("Access-Control-Request-Method", "POST")
@@ -170,12 +227,15 @@ func TestCORS_DisabledByDefault(t *testing.T) {
 	require.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
 }
 
-func TestCORS_AllowCredentials(t *testing.T) {
+func TestCORS_UnknownBucketFallsThrough(t *testing.T) {
+	// CORSSource configured but the inbound bucket has no rules.
 	ups := httptest.NewServer(newUpstream())
 	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins:   []string{"https://app.example.com"},
-		AllowCredentials: true,
+	proxy := newCORSTestServer(t, ups, newPostCred(), map[string][]BucketCORSRule{
+		"other-bucket": {{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"POST"},
+		}},
 	})
 	defer proxy.Close()
 
@@ -185,46 +245,41 @@ func TestCORS_AllowCredentials(t *testing.T) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	require.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+	require.NotEqual(t, http.StatusNoContent, resp.StatusCode)
+	require.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
 }
 
-func TestCORS_AllowCredentialsSuppressedForWildcard(t *testing.T) {
-	// Browsers reject credentials with wildcard origin; we suppress the
-	// header even if the operator set AllowCredentials=true.
-	ups := httptest.NewServer(newUpstream())
-	defer ups.Close()
-	proxy := newCORSTestServer(t, ups, newPostCred(), &CORSConfig{
-		AllowedOrigins:   []string{"*"},
-		AllowCredentials: true,
-	})
-	defer proxy.Close()
-
-	req, _ := http.NewRequest(http.MethodOptions, proxy.URL+"/uploads", nil)
-	req.Header.Set("Origin", "https://app.example.com")
-	req.Header.Set("Access-Control-Request-Method", "POST")
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	require.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
-}
-
-func TestCORS_AllowedOriginHelper(t *testing.T) {
+func TestCORS_MatchHelper(t *testing.T) {
+	rules := []BucketCORSRule{
+		{AllowedOrigins: []string{"https://a.example.com"}, AllowedMethods: []string{"POST"}},
+		{AllowedOrigins: []string{"*"}, AllowedMethods: []string{"GET"}},
+	}
 	cases := []struct {
-		name   string
-		cfg    *CORSConfig
-		origin string
-		want   string
+		name    string
+		rules   []BucketCORSRule
+		origin  string
+		method  string
+		want    string
+		hitRule int // index into rules, -1 = no match
 	}{
-		{"nil cfg", nil, "https://a.example.com", ""},
-		{"empty origin", &CORSConfig{AllowedOrigins: []string{"*"}}, "", ""},
-		{"wildcard match", &CORSConfig{AllowedOrigins: []string{"*"}}, "https://a.example.com", "*"},
-		{"exact match", &CORSConfig{AllowedOrigins: []string{"https://a.example.com"}}, "https://a.example.com", "https://a.example.com"},
-		{"port matters", &CORSConfig{AllowedOrigins: []string{"https://a.example.com"}}, "https://a.example.com:8443", ""},
-		{"no match", &CORSConfig{AllowedOrigins: []string{"https://a.example.com"}}, "https://b.example.org", ""},
+		{"nil rules", nil, "https://a.example.com", "POST", "", -1},
+		{"empty origin", rules, "", "POST", "", -1},
+		{"exact origin + method", rules, "https://a.example.com", "POST", "https://a.example.com", 0},
+		{"port matters", rules, "https://a.example.com:8443", "POST", "", -1},
+		{"wildcard rule matches any origin", rules, "https://x.example.org", "GET", "*", 1},
+		{"method mismatch picks no rule", rules, "https://a.example.com", "GET", "*", 1},
+		{"no match", rules, "https://b.example.org", "DELETE", "", -1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.want, allowedOrigin(tc.cfg, tc.origin))
+			rule, allow := matchCORSRule(tc.rules, tc.origin, tc.method)
+			require.Equal(t, tc.want, allow)
+			if tc.hitRule < 0 {
+				require.Nil(t, rule)
+			} else {
+				require.NotNil(t, rule)
+				require.Equal(t, tc.rules[tc.hitRule].AllowedMethods, rule.AllowedMethods)
+			}
 		})
 	}
 }

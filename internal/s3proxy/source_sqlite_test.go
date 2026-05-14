@@ -130,6 +130,84 @@ func TestSQLiteSource_AnonymousBindingsRoundTrip(t *testing.T) {
 	require.InDelta(t, 50, got.PerSourceIPRPS, 0.001)
 }
 
+func TestSQLiteSource_CORSRulesRoundTrip(t *testing.T) {
+	store := openTestStore(t)
+	sealer := newTestSealer(t)
+	src := NewSQLiteSource(store, sealer, nil)
+
+	now := time.Now().UTC()
+	require.NoError(t, store.UpsertS3BucketCORS(context.Background(),
+		&sqlite.S3BucketCORS{
+			BackendID: "minio", Bucket: "Uploads",
+			Rules:     `[{"allowed_origins":["https://docs.example.com"],"allowed_methods":["POST"],"max_age_seconds":600}]`,
+			CreatedAt: now, UpdatedAt: now,
+		}))
+
+	require.NoError(t, src.Reload(context.Background()))
+
+	rules, ok := src.LookupCORS("uploads") // case-insensitive
+	require.True(t, ok)
+	require.Len(t, rules, 1)
+	require.Equal(t, []string{"https://docs.example.com"}, rules[0].AllowedOrigins)
+	require.Equal(t, 600, rules[0].MaxAgeSeconds)
+}
+
+func TestSQLiteSource_CORSUnionAcrossBackends(t *testing.T) {
+	// Same bucket name on two backends → rules should be unioned, so a
+	// preflight succeeds if any backend's rule covers the origin/method.
+	store := openTestStore(t)
+	sealer := newTestSealer(t)
+	src := NewSQLiteSource(store, sealer, nil)
+
+	now := time.Now().UTC()
+	require.NoError(t, store.UpsertS3BucketCORS(context.Background(),
+		&sqlite.S3BucketCORS{
+			BackendID: "minio", Bucket: "shared",
+			Rules:     `[{"allowed_origins":["https://a.example"],"allowed_methods":["GET"]}]`,
+			CreatedAt: now, UpdatedAt: now,
+		}))
+	require.NoError(t, store.UpsertS3BucketCORS(context.Background(),
+		&sqlite.S3BucketCORS{
+			BackendID: "garage", Bucket: "shared",
+			Rules:     `[{"allowed_origins":["https://b.example"],"allowed_methods":["POST"]}]`,
+			CreatedAt: now, UpdatedAt: now,
+		}))
+
+	require.NoError(t, src.Reload(context.Background()))
+
+	rules, ok := src.LookupCORS("shared")
+	require.True(t, ok)
+	require.Len(t, rules, 2, "rules from both backends must be unioned")
+}
+
+func TestSQLiteSource_CORSMalformedRowsSkipped(t *testing.T) {
+	store := openTestStore(t)
+	sealer := newTestSealer(t)
+	src := NewSQLiteSource(store, sealer, nil)
+
+	now := time.Now().UTC()
+	require.NoError(t, store.UpsertS3BucketCORS(context.Background(),
+		&sqlite.S3BucketCORS{
+			BackendID: "minio", Bucket: "good",
+			Rules:     `[{"allowed_origins":["*"],"allowed_methods":["GET"]}]`,
+			CreatedAt: now, UpdatedAt: now,
+		}))
+	// Garbage rules JSON — the reload should warn and skip, not error.
+	require.NoError(t, store.UpsertS3BucketCORS(context.Background(),
+		&sqlite.S3BucketCORS{
+			BackendID: "minio", Bucket: "broken",
+			Rules:     `not json`,
+			CreatedAt: now, UpdatedAt: now,
+		}))
+
+	require.NoError(t, src.Reload(context.Background()))
+
+	_, ok := src.LookupCORS("good")
+	require.True(t, ok)
+	_, ok = src.LookupCORS("broken")
+	require.False(t, ok)
+}
+
 func TestSQLiteSource_RequiresSealer(t *testing.T) {
 	store := openTestStore(t)
 	src := NewSQLiteSource(store, nil, nil)

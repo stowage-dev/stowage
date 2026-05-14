@@ -255,6 +255,26 @@ CREATE TABLE s3_anonymous_bindings (
 );
 `,
 	},
+	{
+		Version: 11,
+		Name:    "s3_bucket_cors",
+		// Per-bucket CORS rules enforced by the embedded proxy. Replaces the
+		// cluster-wide s3_proxy.cors YAML knob. rules is a JSON array of
+		// CORSRule objects (allowed_origins, allowed_methods, allowed_headers,
+		// expose_headers, max_age_seconds). The proxy keeps a bucket-keyed
+		// in-memory cache fed by SQLiteSource.Reload — preflights never
+		// round-trip to disk or the upstream backend.
+		SQL: `
+CREATE TABLE s3_bucket_cors (
+  backend_id TEXT NOT NULL,
+  bucket     TEXT NOT NULL,
+  rules      TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (backend_id, bucket)
+);
+`,
+	},
 }
 
 func (s *Store) migrate(ctx context.Context) error {

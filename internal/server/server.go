@@ -218,6 +218,10 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Server, 
 			_ = store.Close()
 			return nil, fmt.Errorf("prime sqlite credential source: %w", err)
 		}
+		// Wire the source as the reloader for backend handlers (bucket
+		// CORS PUTs trigger Reload so the proxy's cache sees the change
+		// without waiting for the periodic tick).
+		backendDeps.Reloader = s3sqliteSource
 		if cfg.S3Proxy.Kubernetes.Enabled {
 			ns := cfg.S3Proxy.Kubernetes.Namespace
 			if ns == "" {
@@ -360,6 +364,15 @@ func (s *Server) buildS3Proxy(
 	// Bridge the slog logger into the logr API the proxy uses internally.
 	proxyLog := logr.FromSlogHandler(s.logger.Handler()).WithName("s3proxy")
 
+	// Per-bucket CORS rules live in the s3_bucket_cors SQLite table; the
+	// SQLiteSource already keeps the bucket-keyed cache the proxy queries
+	// at preflight time. Reuse it as the proxy's CORSSource so writes via
+	// the admin API (which call Reload) reach the proxy immediately.
+	var corsSource s3proxy.CORSSource
+	if s.s3sqlite != nil {
+		corsSource = s.s3sqlite
+	}
+
 	proxyServer := s3proxy.NewServer(s3proxy.Config{
 		Source:               merged,
 		Backends:             resolver,
@@ -375,6 +388,7 @@ func (s *Server) buildS3Proxy(
 		Audit:                audit,
 		Quotas:               quotaSvc,
 		SuccessReadAuditRate: s.cfg.Audit.Sampling.ProxySuccessReadRate,
+		CORSSource:           corsSource,
 	})
 
 	// Drop cached SigV4 signing keys whenever the SQLite source rebuilds

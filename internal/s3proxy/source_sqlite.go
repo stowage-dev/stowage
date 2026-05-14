@@ -5,6 +5,7 @@ package s3proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -25,9 +26,10 @@ type SQLiteSource struct {
 	sealer *secrets.Sealer
 	logger *slog.Logger
 
-	mu       sync.RWMutex
-	byAKID   map[string]*VirtualCredential
-	byBucket map[string]*AnonymousBinding
+	mu           sync.RWMutex
+	byAKID       map[string]*VirtualCredential
+	byBucket     map[string]*AnonymousBinding
+	byBucketCORS map[string][]BucketCORSRule
 
 	// onReload, if set, fires after every successful Reload. Used by the
 	// server to evict stale signing-key cache entries when a credential is
@@ -49,11 +51,12 @@ func NewSQLiteSource(store *sqlite.Store, sealer *secrets.Sealer, logger *slog.L
 		logger = slog.Default()
 	}
 	return &SQLiteSource{
-		store:    store,
-		sealer:   sealer,
-		logger:   logger,
-		byAKID:   map[string]*VirtualCredential{},
-		byBucket: map[string]*AnonymousBinding{},
+		store:        store,
+		sealer:       sealer,
+		logger:       logger,
+		byAKID:       map[string]*VirtualCredential{},
+		byBucket:     map[string]*AnonymousBinding{},
+		byBucketCORS: map[string][]BucketCORSRule{},
 	}
 }
 
@@ -89,6 +92,24 @@ func (s *SQLiteSource) LookupAnon(bucket string) (*AnonymousBinding, bool) {
 	return &out, true
 }
 
+// LookupCORS returns the union of CORS rules configured for bucket
+// across every backend. The slice is freshly allocated so callers may
+// hold onto it without racing the next Reload.
+func (s *SQLiteSource) LookupCORS(bucket string) ([]BucketCORSRule, bool) {
+	if bucket == "" {
+		return nil, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rules, ok := s.byBucketCORS[strings.ToLower(bucket)]
+	if !ok || len(rules) == 0 {
+		return nil, false
+	}
+	out := make([]BucketCORSRule, len(rules))
+	copy(out, rules)
+	return out, true
+}
+
 // Size returns the number of cached virtual credentials. Used for the
 // proxy_credential_cache_size gauge.
 func (s *SQLiteSource) Size() int {
@@ -112,6 +133,10 @@ func (s *SQLiteSource) Reload(ctx context.Context) error {
 	bindings, err := s.store.ListS3AnonymousBindings(ctx)
 	if err != nil {
 		return fmt.Errorf("list s3_anonymous_bindings: %w", err)
+	}
+	corsRows, err := s.store.ListS3BucketCORS(ctx)
+	if err != nil {
+		return fmt.Errorf("list s3_bucket_cors: %w", err)
 	}
 
 	newAKID := make(map[string]*VirtualCredential, len(creds))
@@ -166,9 +191,28 @@ func (s *SQLiteSource) Reload(ctx context.Context) error {
 		}
 	}
 
+	newCORS := make(map[string][]BucketCORSRule, len(corsRows))
+	for _, row := range corsRows {
+		var rules []BucketCORSRule
+		if err := json.Unmarshal([]byte(row.Rules), &rules); err != nil {
+			s.logger.Warn("s3proxy: skip CORS row — rules JSON malformed",
+				"backend", row.BackendID, "bucket", row.Bucket, "err", err.Error())
+			continue
+		}
+		if len(rules) == 0 {
+			continue
+		}
+		key := strings.ToLower(row.Bucket)
+		// Same bucket name on multiple backends → union the rules so any
+		// allowed origin/method on any backend lets the preflight through.
+		// Origin disambiguation isn't possible at preflight time anyway.
+		newCORS[key] = append(newCORS[key], rules...)
+	}
+
 	s.mu.Lock()
 	s.byAKID = newAKID
 	s.byBucket = newBucket
+	s.byBucketCORS = newCORS
 	s.mu.Unlock()
 	if s.onReload != nil {
 		s.onReload()

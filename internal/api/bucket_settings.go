@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,7 +16,9 @@ import (
 	"github.com/stowage-dev/stowage/internal/audit"
 	"github.com/stowage-dev/stowage/internal/backend"
 	"github.com/stowage-dev/stowage/internal/backend/s3v4"
+	"github.com/stowage-dev/stowage/internal/store/sqlite"
 )
+
 
 // Bucket settings — Phase 6 Slice A. Each handler is admin-only at the
 // router layer; here we just speak to the backend driver.
@@ -101,59 +104,55 @@ var allowedCORSMethods = map[string]struct{}{
 	"GET": {}, "PUT": {}, "POST": {}, "DELETE": {}, "HEAD": {},
 }
 
+// handleGetBucketCORS returns the proxy-side CORS rules stored in stowage's
+// own s3_bucket_cors table. Falls back to an empty payload when no row
+// exists so the dashboard editor renders cleanly on first edit.
 func (d *BackendDeps) handleGetBucketCORS(w http.ResponseWriter, r *http.Request) {
-	b, ok := d.resolveBackend(w, r)
-	if !ok {
+	if d.Store == nil {
+		writeError(w, http.StatusServiceUnavailable, "store_unavailable", "store not configured", "")
 		return
 	}
+	backendID := chi.URLParam(r, "bid")
 	bucket := chi.URLParam(r, "bucket")
-	if !b.Capabilities().CORS {
-		writeError(w, http.StatusNotImplemented, "not_supported", "backend does not support CORS", "")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), settingsReadTimeout)
 	defer cancel()
-	rules, err := b.GetBucketCORS(ctx, bucket)
+	row, err := d.Store.GetS3BucketCORS(ctx, backendID, bucket)
 	if err != nil {
-		// Backends return 404 when no CORS configuration exists. Treat that
-		// as "no rules" rather than a hard error so the UI can render an
-		// empty editor.
-		if s3v4.IsNotFound(err) {
+		if errors.Is(err, sqlite.ErrS3BucketCORSNotFound) {
 			writeJSON(w, http.StatusOK, corsPayload{Rules: []corsRuleDTO{}})
 			return
 		}
-		d.backendError(w, r, err, "get cors")
+		d.Logger.Warn("get bucket cors", "err", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", "could not read CORS rules", "")
 		return
 	}
-	out := make([]corsRuleDTO, 0, len(rules))
-	for _, ru := range rules {
-		out = append(out, corsRuleDTO{
-			AllowedOrigins: ru.AllowedOrigins,
-			AllowedMethods: ru.AllowedMethods,
-			AllowedHeaders: ru.AllowedHeaders,
-			ExposeHeaders:  ru.ExposeHeaders,
-			MaxAgeSeconds:  ru.MaxAgeSeconds,
-		})
+	var rules []corsRuleDTO
+	if err := json.Unmarshal([]byte(row.Rules), &rules); err != nil {
+		d.Logger.Warn("decode bucket cors rules", "err", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", "stored CORS rules are corrupt", "")
+		return
 	}
-	writeJSON(w, http.StatusOK, corsPayload{Rules: out})
+	if rules == nil {
+		rules = []corsRuleDTO{}
+	}
+	writeJSON(w, http.StatusOK, corsPayload{Rules: rules})
 }
 
+// handlePutBucketCORS replaces the proxy-side CORS rules for the bucket.
+// An empty rule list deletes the row outright so the bucket stops
+// answering preflights — same effect as "no CORS configured".
 func (d *BackendDeps) handlePutBucketCORS(w http.ResponseWriter, r *http.Request) {
-	b, ok := d.resolveBackend(w, r)
-	if !ok {
+	if d.Store == nil {
+		writeError(w, http.StatusServiceUnavailable, "store_unavailable", "store not configured", "")
 		return
 	}
+	backendID := chi.URLParam(r, "bid")
 	bucket := chi.URLParam(r, "bucket")
-	if !b.Capabilities().CORS {
-		writeError(w, http.StatusNotImplemented, "not_supported", "backend does not support CORS", "")
-		return
-	}
 	var req corsPayload
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body", "")
 		return
 	}
-	rules := make([]backend.CORSRule, 0, len(req.Rules))
 	for i, ru := range req.Rules {
 		if len(ru.AllowedOrigins) == 0 {
 			writeError(w, http.StatusBadRequest, "invalid_cors",
@@ -177,25 +176,54 @@ func (d *BackendDeps) handlePutBucketCORS(w http.ResponseWriter, r *http.Request
 				"rule "+strconv.Itoa(i)+": max_age_seconds must be non-negative", "")
 			return
 		}
-		rules = append(rules, backend.CORSRule{
-			AllowedOrigins: ru.AllowedOrigins,
-			AllowedMethods: ru.AllowedMethods,
-			AllowedHeaders: ru.AllowedHeaders,
-			ExposeHeaders:  ru.ExposeHeaders,
-			MaxAgeSeconds:  ru.MaxAgeSeconds,
-		})
 	}
-	if err := b.SetBucketCORS(r.Context(), bucket, rules); err != nil {
-		d.backendError(w, r, err, "set cors")
-		return
+
+	if len(req.Rules) == 0 {
+		if err := d.Store.DeleteS3BucketCORS(r.Context(), backendID, bucket); err != nil &&
+			!errors.Is(err, sqlite.ErrS3BucketCORSNotFound) {
+			d.Logger.Warn("delete bucket cors", "err", err.Error())
+			writeError(w, http.StatusInternalServerError, "internal", "could not clear CORS rules", "")
+			return
+		}
+	} else {
+		rulesJSON, err := json.Marshal(req.Rules)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_cors", "rules not encodable", "")
+			return
+		}
+		now := time.Now().UTC()
+		row := &sqlite.S3BucketCORS{
+			BackendID: backendID,
+			Bucket:    bucket,
+			Rules:     string(rulesJSON),
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := d.Store.UpsertS3BucketCORS(r.Context(), row); err != nil {
+			d.Logger.Warn("upsert bucket cors", "err", err.Error())
+			writeError(w, http.StatusInternalServerError, "internal", "could not write CORS rules", "")
+			return
+		}
 	}
+	d.fireReload(r.Context())
 	audit.RecordRequest(d.Audit, r, audit.Event{
 		Action:  "bucket.cors.set",
-		Backend: chi.URLParam(r, "bid"),
+		Backend: backendID,
 		Bucket:  bucket,
-		Detail:  map[string]any{"rules": len(rules)},
+		Detail:  map[string]any{"rules": len(req.Rules)},
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// fireReload nudges the SQLiteSource to refresh so CORS edits land in the
+// proxy's in-memory cache immediately instead of on the next periodic tick.
+func (d *BackendDeps) fireReload(ctx context.Context) {
+	if d.Reloader == nil {
+		return
+	}
+	if err := d.Reloader.Reload(ctx); err != nil {
+		d.Logger.Warn("bucket cors reload after CRUD failed", "err", err.Error())
+	}
 }
 
 // ---- Policy -------------------------------------------------------------
