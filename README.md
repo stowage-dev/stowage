@@ -72,7 +72,7 @@ Full walkthroughs:
 ## What ships in v1.0
 
 A complete feature matrix lives at
-[stowage.dev/features](https://stowage.dev/features); the summary
+[stowage.dev/features](https://stowage.dev#features); the summary
 below mirrors it.
 
 **Dashboard.** OIDC, local accounts with argon2id hashing, or a static
