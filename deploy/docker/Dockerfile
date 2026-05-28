@@ -43,14 +43,15 @@ RUN CGO_ENABLED=0 go build \
     ./cmd/stowage
 
 # --- runtime stage --------------------------------------------------------
-# Alpine gives us tini (for clean signal handling) and ca-certificates
-# (so the in-binary quickstart can fetch MinIO over TLS). Everything else
-# the quickstart needs — download, sha256 verify, subprocess management —
-# is handled inside the stowage binary.
+# Alpine gives us tini (for clean signal handling), ca-certificates
+# (so the in-binary quickstart can fetch MinIO over TLS), and the sqlite
+# CLI (for inspecting/maintaining the stowage database from a shell).
+# Everything else the quickstart needs — download, sha256 verify,
+# subprocess management — is handled inside the stowage binary.
 FROM alpine:3.20
 # Explicit numeric UID/GID so Kubernetes' runAsNonRoot admission can
 # verify the image runs as non-root without resolving /etc/passwd.
-RUN apk add --no-cache ca-certificates tini \
+RUN apk add --no-cache ca-certificates tini sqlite \
  && addgroup -S -g 65532 stowage \
  && adduser -S -u 65532 -G stowage -h /home/stowage stowage \
  && mkdir -p /data \
