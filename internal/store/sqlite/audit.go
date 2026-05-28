@@ -92,6 +92,17 @@ INSERT INTO audit_events (ts, user_id, action, backend_id, bucket, object_key,
   request_id, ip, user_agent, status, detail)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
+// PurgeAuditEventsBefore deletes every audit event with ts strictly older
+// than cutoff and returns the number of rows removed. Backs the retention
+// sweep; the audit_ts_desc index keeps the range scan cheap.
+func (s *Store) PurgeAuditEventsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	res, err := s.DB.ExecContext(ctx, `DELETE FROM audit_events WHERE ts < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // ListAuditEvents returns events newest-first matching the filter.
 func (s *Store) ListAuditEvents(ctx context.Context, f AuditFilter) ([]*AuditEvent, error) {
 	q, args := buildAuditQuery(f, false)

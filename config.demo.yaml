@@ -22,6 +22,13 @@ s3_proxy:
 ratelimit:
   api_per_minute: 0
 
+# Audit log retention. Events older than max_age are pruned by an hourly
+# background sweep so the audit table can't grow without bound. Omit or set
+# to 0 to keep the trail forever (the default).
+audit:
+  retention:
+    max_age: 2160h  # 90 days
+
 server:
   listen: ":8080"
   secret_key_file: ./stowage.key

@@ -507,6 +507,14 @@ func (s *Server) Run(ctx context.Context) error {
 		go s.audit.Run(ctx)
 	}
 
+	// Audit retention sweep — prune events older than the configured max
+	// age so the audit table can't grow without bound. A non-positive
+	// MaxAge keeps the trail forever (the default), so the goroutine is
+	// only started when an operator opts in.
+	if s.cfg.Audit.Retention.MaxAge > 0 {
+		go s.reapAuditEvents(ctx, s.cfg.Audit.Retention.MaxAge)
+	}
+
 	// Quota scanner — set ScanInterval to a negative value in config to
 	// disable. The scanner is best-effort: failures are logged and the
 	// next tick retries. Same dial controls the size-tracking scanner;
@@ -590,6 +598,35 @@ func (s *Server) reapSessions(ctx context.Context) {
 			if n, err := s.store.PurgeExpiredSessions(ctx, time.Now().UTC()); err == nil && n > 0 {
 				s.logger.Debug("purged expired sessions", "count", n)
 			}
+		}
+	}
+}
+
+// reapAuditEvents deletes audit rows older than maxAge on a fixed cadence so
+// the audit table doesn't grow unbounded. Runs an initial sweep immediately
+// so a freshly-configured retention window takes effect at startup rather
+// than after the first tick.
+func (s *Server) reapAuditEvents(ctx context.Context, maxAge time.Duration) {
+	sweep := func() {
+		cutoff := time.Now().UTC().Add(-maxAge)
+		n, err := s.store.PurgeAuditEventsBefore(ctx, cutoff)
+		if err != nil {
+			s.logger.Warn("audit retention sweep failed", "err", err.Error())
+			return
+		}
+		if n > 0 {
+			s.logger.Info("purged expired audit events", "count", n, "older_than", cutoff)
+		}
+	}
+	sweep()
+	t := time.NewTicker(1 * time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			sweep()
 		}
 	}
 }

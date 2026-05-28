@@ -61,7 +61,19 @@ type OperatorWebhookConfig struct {
 // Noop is a valid implementation), so sampling here is a continuation
 // of that "best-effort" stance rather than a new tradeoff.
 type AuditConfig struct {
-	Sampling AuditSamplingConfig `yaml:"sampling"`
+	Sampling  AuditSamplingConfig  `yaml:"sampling"`
+	Retention AuditRetentionConfig `yaml:"retention"`
+}
+
+// AuditRetentionConfig bounds how long audit rows are kept so the table
+// can't grow without limit on a long-lived deployment.
+type AuditRetentionConfig struct {
+	// MaxAge is how long an audit event is retained. Events older than this
+	// are deleted by a periodic background sweep. Zero or negative (the
+	// default) disables pruning entirely — the trail is kept forever, which
+	// is the right choice for compliance deployments that must never drop
+	// rows. Set e.g. 2160h (90d) to cap growth.
+	MaxAge time.Duration `yaml:"max_age"`
 }
 
 // AuditSamplingConfig governs which events are written.
