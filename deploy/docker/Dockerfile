@@ -29,7 +29,7 @@ COPY web/dist /web/dist
 FROM frontend-${FRONTEND} AS frontend
 
 # --- backend build stage --------------------------------------------------
-FROM golang:1.26-alpine AS backend
+FROM golang:1.27-alpine AS backend
 WORKDIR /src
 RUN apk add --no-cache git
 COPY go.mod go.sum* ./
@@ -48,7 +48,7 @@ RUN CGO_ENABLED=0 go build \
 # CLI (for inspecting/maintaining the stowage database from a shell).
 # Everything else the quickstart needs — download, sha256 verify,
 # subprocess management — is handled inside the stowage binary.
-FROM alpine:3.20
+FROM alpine:3.24
 # Explicit numeric UID/GID so Kubernetes' runAsNonRoot admission can
 # verify the image runs as non-root without resolving /etc/passwd.
 RUN apk add --no-cache ca-certificates tini sqlite \
